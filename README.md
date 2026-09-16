@@ -29,6 +29,17 @@ A manual time tracker for people who just want to press play, work, and press st
 
 [Tauri 2](https://tauri.app) (Rust) · [React 19](https://react.dev) + TypeScript · [Tailwind CSS 4](https://tailwindcss.com) · SQLite · [Zustand](https://github.com/pmndrs/zustand) · [i18next](https://www.i18next.com)
 
+## Installing
+
+- **Arch Linux**: not yet on the AUR (registrations are temporarily closed there), but `packaging/aur/PKGBUILD` builds the same package AUR would host:
+  ```sh
+  git clone https://github.com/RickCaleg/chronos.git
+  cd chronos/packaging/aur
+  makepkg -si
+  ```
+  This installs `chronos` and `chronos-cli` via pacman, with a proper `.desktop` entry and icons. Once AUR registration reopens we'll publish it there too.
+- **Other Linux / Windows**: grab an installer from the [latest release](https://github.com/RickCaleg/chronos/releases/latest) (`.deb`, `.rpm`, `.AppImage`, or `.msi`/`.exe`).
+
 ## Getting started
 
 ### Prerequisites

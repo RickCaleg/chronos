@@ -91,8 +91,28 @@ fn migrations() -> Vec<Migration> {
     ]
 }
 
+/// Our AppImage bundle (via linuxdeploy-plugin-gtk) forces `GDK_BACKEND=x11`
+/// to dodge an unrelated Wayland webview crash (tauri-apps/tauri#8541), which
+/// runs the app under XWayland instead of natively. `GDK_SCALE` is meant for
+/// *native* Wayland/X11 sessions (e.g. `GDK_SCALE=2` on this desktop's
+/// fractional-scaled HiDPI panel); under XWayland it stacks with the
+/// compositor's own auto-scaling for non-Wayland-native clients, roughly
+/// doubling the UI size. Only strip it when that x11 override is in effect —
+/// native .deb/.rpm installs run under real Wayland and size correctly.
+#[cfg(target_os = "linux")]
+fn fix_appimage_x11_scaling() {
+    if std::env::var("GDK_BACKEND").as_deref() == Ok("x11") {
+        std::env::remove_var("GDK_SCALE");
+        std::env::remove_var("GDK_DPI_SCALE");
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn fix_appimage_x11_scaling() {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    fix_appimage_x11_scaling();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
