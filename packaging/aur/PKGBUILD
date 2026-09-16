@@ -1,0 +1,40 @@
+# Maintainer: Richardson Calegari Saconi <richardson.saconi@outlook.com>
+pkgname=chronos
+pkgver=0.3.1
+pkgrel=1
+pkgdesc="A manual, local-first time tracker with a CLI companion, built with Tauri and React"
+arch=('x86_64')
+url="https://github.com/RickCaleg/chronos"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3' 'hicolor-icon-theme' 'desktop-file-utils')
+makedepends=('rust' 'nodejs' 'npm')
+source=("$pkgname-$pkgver.tar.gz::https://github.com/RickCaleg/chronos/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('9b0d450f440a36ff8a07a987062effce30f963e6835a71a1cc0569d0cf7df649')
+
+build() {
+  cd "$pkgname-$pkgver"
+
+  npm ci
+  # createUpdaterArtifacts is enabled in tauri.conf.json for the official
+  # release pipeline, which signs builds with a private key that only
+  # exists in that CI. Disable it here so a plain from-source build
+  # (no signing keys available) doesn't fail; distro packages don't go
+  # through the in-app updater anyway.
+  npm run tauri build -- --bundles deb --config '{"bundle":{"createUpdaterArtifacts":false}}'
+  cargo build --release --locked -p chronos-cli
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+
+  # The .deb Tauri builds already has the correct FHS layout (binary,
+  # hicolor icons, .desktop file) generated straight from tauri.conf.json —
+  # unpack it instead of hand-maintaining a duplicate of that metadata here.
+  local debfile
+  debfile=$(find target/release/bundle/deb -name '*.deb')
+  ar x "$debfile" --output="$srcdir/deb-extract"
+  bsdtar -xf "$srcdir"/deb-extract/data.tar.* -C "$pkgdir"
+
+  install -Dm755 target/release/chronos-cli "$pkgdir/usr/bin/chronos-cli"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

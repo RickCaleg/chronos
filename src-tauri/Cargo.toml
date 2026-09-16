@@ -1,6 +1,6 @@
 [package]
 name = "chronos"
-version = "0.3.0"
+version = "0.3.1"
 description = "A manual, local-first time tracker built with Tauri and React."
 authors = ["Richardson Calegari Saconi"]
 license = "MIT"
@@ -30,3 +30,10 @@ tauri-plugin-fs = "2.5.2"
 tauri-plugin-clipboard-manager = "2.3.3"
 tauri-plugin-updater = "2.11.0"
 tauri-plugin-process = "2.3.1"
+
+# tauri-plugin-sql's sqlite feature links the system libsqlite3 by default,
+# which is fragile across distros (e.g. a clean build failed on Arch with an
+# undefined `sqlite3_unlock_notify` symbol). Force the vendored/bundled
+# SQLite instead, same as chronos-cli already does, for a build that doesn't
+# depend on the host's SQLite version or how it was compiled.
+libsqlite3-sys = { version = "0.28", features = ["bundled"] }
