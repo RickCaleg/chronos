@@ -1,6 +1,6 @@
 pkgbase = chronos
 	pkgdesc = A manual, local-first time tracker with a CLI companion, built with Tauri and React
-	pkgver = 0.3.1
+	pkgver = 0.3.3
 	pkgrel = 1
 	url = https://github.com/RickCaleg/chronos
 	arch = x86_64
@@ -12,7 +12,7 @@ pkgbase = chronos
 	depends = gtk3
 	depends = hicolor-icon-theme
 	depends = desktop-file-utils
-	source = chronos-0.3.1.tar.gz::https://github.com/RickCaleg/chronos/archive/refs/tags/v0.3.1.tar.gz
-	sha256sums = 468c3257640c014b0f6a89a4a4ccdee47b47ed8ba0a7d39d26539ec8a4e3c7bf
+	source = chronos-0.3.3.tar.gz::https://github.com/RickCaleg/chronos/archive/refs/tags/v0.3.3.tar.gz
+	sha256sums = b6f49d54ab1a91dd5dcaf37cbfe7b0b81c01df31d765ca2c0aa173902f803e91
 
 pkgname = chronos
