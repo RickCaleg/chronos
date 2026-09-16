@@ -76,6 +76,12 @@ export function formatTimeShort(iso: string, locale: string): string {
   );
 }
 
+/** Plain "dd/MM" date, locale-independent, for copy-to-clipboard text. */
+export function formatDateShort(iso: string): string {
+  const d = new Date(iso);
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+}
+
 export function formatDayLabel(iso: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, { weekday: "long", day: "2-digit", month: "long" }).format(
     new Date(iso),

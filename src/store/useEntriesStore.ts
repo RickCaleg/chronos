@@ -58,22 +58,24 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
   },
 
   update: async (id, patch) => {
-    await entriesDb.updateEntry(id, patch);
-    set({
-      entries: get().entries.map((e) =>
-        e.id === id
-          ? {
-              ...e,
-              ...(patch.description !== undefined ? { description: patch.description } : {}),
-              ...(patch.taskNumber !== undefined ? { taskNumber: patch.taskNumber } : {}),
-              ...(patch.projectId !== undefined ? { projectId: patch.projectId } : {}),
-              ...(patch.startTime !== undefined ? { startTime: patch.startTime } : {}),
-              ...(patch.endTime !== undefined ? { endTime: patch.endTime } : {}),
-              ...(patch.durationSeconds !== undefined ? { durationSeconds: patch.durationSeconds } : {}),
-            }
-          : e,
-      ),
+    const applyPatch = (e: TimeEntry): TimeEntry => ({
+      ...e,
+      ...(patch.description !== undefined ? { description: patch.description } : {}),
+      ...(patch.taskNumber !== undefined ? { taskNumber: patch.taskNumber } : {}),
+      ...(patch.projectId !== undefined ? { projectId: patch.projectId } : {}),
+      ...(patch.startTime !== undefined ? { startTime: patch.startTime } : {}),
+      ...(patch.endTime !== undefined ? { endTime: patch.endTime } : {}),
+      ...(patch.durationSeconds !== undefined ? { durationSeconds: patch.durationSeconds } : {}),
     });
+    // Apply optimistically, before the DB round-trip: the running entry's
+    // description field is bound directly to this store, so waiting for
+    // `await` first left the input showing stale text (and dropped
+    // keystrokes typed faster than the round-trip) while the timer was running.
+    set((state) => ({
+      entries: state.entries.map((e) => (e.id === id ? applyPatch(e) : e)),
+      runningEntry: state.runningEntry?.id === id ? applyPatch(state.runningEntry) : state.runningEntry,
+    }));
+    await entriesDb.updateEntry(id, patch);
   },
 
   remove: async (id) => {

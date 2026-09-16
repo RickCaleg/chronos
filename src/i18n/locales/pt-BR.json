@@ -22,6 +22,7 @@
     "noDescription": "(sem descrição)",
     "deleteConfirm": "Excluir este registro?",
     "copy": "Copiar",
+    "copyDay": "Copiar resumo do dia",
     "restart": "Reiniciar timer",
     "addManual": "Adicionar registro manual"
   },

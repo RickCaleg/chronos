@@ -22,6 +22,7 @@
     "noDescription": "(no description)",
     "deleteConfirm": "Delete this entry?",
     "copy": "Copy",
+    "copyDay": "Copy day summary",
     "restart": "Restart timer",
     "addManual": "Add manual entry"
   },
