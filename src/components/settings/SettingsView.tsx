@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Download, FileSpreadsheet, Trash2, Upload } from "lucide-react";
+import { Download, FileSpreadsheet, RefreshCw, Trash2, Upload } from "lucide-react";
 import { confirm } from "@tauri-apps/plugin-dialog";
+import { getVersion } from "@tauri-apps/api/app";
 import { useThemeStore, type ThemePreference } from "../../store/useThemeStore";
 import { useProjectsStore } from "../../store/useProjectsStore";
 import { useEntriesStore } from "../../store/useEntriesStore";
 import { useAppSettingsStore } from "../../store/useAppSettingsStore";
+import { useUpdaterStore } from "../../store/useUpdaterStore";
 import { Button } from "../ui/Button";
 import { Switch } from "../ui/Switch";
 import { SUPPORTED_LANGUAGES } from "../../i18n";
@@ -34,7 +36,13 @@ export function SettingsView() {
   const { t, i18n } = useTranslation();
   const { theme, setTheme, omarchyAvailable } = useThemeStore();
   const { groupSimilarEntries, setGroupSimilarEntries } = useAppSettingsStore();
+  const updater = useUpdaterStore();
+  const [appVersion, setAppVersion] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    getVersion().then(setAppVersion);
+  }, []);
 
   const themeOptions = omarchyAvailable
     ? [...BASE_THEME_OPTIONS, { value: "omarchy" as const, labelKey: "settings.themeOmarchy" }]
@@ -116,6 +124,67 @@ export function SettingsView() {
           </div>
           <Switch checked={groupSimilarEntries} onChange={setGroupSimilarEntries} label={t("settings.groupSimilar")} />
         </div>
+      </section>
+
+      <section className="mb-6 rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-medium">{t("settings.updates")}</h2>
+          {appVersion && (
+            <span className="text-xs text-[var(--color-text-muted)]">{t("settings.currentVersion", { version: appVersion })}</span>
+          )}
+        </div>
+
+        {updater.status === "available" && (
+          <div className="mb-3 rounded-[2px] border border-[var(--color-accent)] bg-[var(--color-bg)] p-3">
+            <p className="text-sm font-medium">{t("settings.updateAvailable", { version: updater.version })}</p>
+            {updater.body && <p className="mt-1 whitespace-pre-line text-xs text-[var(--color-text-muted)]">{updater.body}</p>}
+            <Button variant="primary" size="sm" className="mt-2" onClick={updater.downloadAndInstall}>
+              <Download size={14} />
+              {t("settings.downloadInstall")}
+            </Button>
+          </div>
+        )}
+
+        {updater.status === "downloading" && (
+          <div className="mb-3">
+            <p className="mb-1 text-sm">{t("settings.downloading", { progress: updater.progress })}</p>
+            <div className="h-1.5 w-full overflow-hidden rounded-[2px] bg-[var(--color-bg)]">
+              <div
+                className="h-full bg-[var(--color-accent)] transition-all"
+                style={{ width: `${updater.progress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {updater.status === "ready" && (
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-[2px] border border-[var(--color-accent)] bg-[var(--color-bg)] p-3">
+            <p className="text-sm">{t("settings.updateReady")}</p>
+            <Button variant="primary" size="sm" onClick={updater.restart}>
+              {t("settings.restartNow")}
+            </Button>
+          </div>
+        )}
+
+        {updater.status === "up-to-date" && (
+          <p className="mb-3 text-xs text-[var(--color-text-muted)]">{t("settings.upToDate")}</p>
+        )}
+
+        {updater.status === "error" && (
+          <p className="mb-3 text-xs text-[var(--color-danger)]">{t("settings.updateCheckFailed", { error: updater.error })}</p>
+        )}
+
+        {updater.status !== "ready" && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={updater.checkForUpdates}
+            disabled={updater.status === "checking" || updater.status === "downloading"}
+          >
+            <RefreshCw size={14} className={updater.status === "checking" ? "animate-spin" : undefined} />
+            {updater.status === "checking" ? t("settings.checkingForUpdates") : t("settings.checkForUpdates")}
+          </Button>
+        )}
       </section>
 
       <section className="rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">

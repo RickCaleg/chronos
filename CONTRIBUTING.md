@@ -18,7 +18,13 @@ You'll need Node.js 20+, a stable Rust toolchain, and the platform prerequisites
 - If you touch any user-facing string, add it to **both** `src/i18n/locales/en.json` and `src/i18n/locales/pt-BR.json`. A key present in only one language will silently fall back to English for the other.
 - The UI follows a deliberately squared design system: corners use `rounded-[2px]` (or `rounded-[1px]` for small color swatches), not Tailwind's `rounded-lg`/`rounded-xl` scale. Colors are always the CSS custom properties in `src/index.css` (`var(--color-*)`), never hardcoded Tailwind colors — the whole point is that light/dark/Omarchy themes recolor the entire app without touching component code.
 - Every interactive element needs a visible `focus-visible` state and to be reachable/operable by keyboard alone — this app is designed to be fully usable without a mouse.
-- Keep new features consistent with the "local-first, no telemetry, no network calls" principle. Anything that would require a server or send data off the device is out of scope.
+- Keep new features consistent with the "local-first, no telemetry" principle: no user data ever leaves the device. The one deliberate exception is the updater, which makes a GET request to GitHub to check the latest release tag — it sends nothing about the user or their data, and never runs without checking `docs/CLI.md`/README first if you're changing it.
+
+## Releasing
+
+See the [README](README.md#publishing-a-release) for the day-to-day `git tag` steps. The release workflow signs every build with a keypair generated via `tauri signer generate`; the private half lives only as the `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` repo secrets (plus a backup the maintainer keeps outside the repo — never commit it). The public half is the `pubkey` in `src-tauri/tauri.conf.json`'s `plugins.updater` config, which is not secret and is what every installed copy of Chronos uses to verify an update before installing it.
+
+If the private key is ever lost, generate a new pair, update the repo secrets and the `pubkey` in `tauri.conf.json`, and know that every previously-installed copy of Chronos will stop being able to verify new releases — they'd need a fresh manual install to pick up the new key.
 
 ## Reporting bugs / suggesting features
 

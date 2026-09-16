@@ -6,6 +6,7 @@ import { ProjectsView } from "./components/projects/ProjectsView";
 import { SettingsView } from "./components/settings/SettingsView";
 import { useProjectsStore } from "./store/useProjectsStore";
 import { useEntriesStore } from "./store/useEntriesStore";
+import { useUpdaterStore } from "./store/useUpdaterStore";
 
 function App() {
   const [view, setView] = useState<View>("timer");
@@ -18,6 +19,7 @@ function App() {
   useEffect(() => {
     loadProjects();
     loadEntries();
+    useUpdaterStore.getState().checkForUpdates();
   }, [loadProjects, loadEntries]);
 
   useEffect(() => {

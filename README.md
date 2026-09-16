@@ -23,6 +23,7 @@ A manual time tracker for people who just want to press play, work, and press st
 - **Theme-aware** — light, dark, follows the OS, or (on Linux) follows your [Omarchy](https://omarchy.org) theme live.
 - **Native by platform** — native title bar on Windows, native GTK decorations on Linux desktop environments, no title bar at all under a standalone window manager (Hyprland, sway, i3, ...).
 - **Your data stays yours** — a local SQLite database, no network calls, no telemetry, no account.
+- **Self-updating** — checks GitHub Releases for a newer version on launch, plus a manual "Check for updates" button in Settings. Updates are cryptographically signed and verified before installing.
 
 ## Tech stack
 
@@ -65,6 +66,12 @@ Pushing a tag matching `v*` (e.g. `v0.1.0`) triggers the [release workflow](.git
 git tag v0.1.0
 git push origin v0.1.0
 ```
+
+The workflow also signs the build (using the `TAURI_SIGNING_PRIVATE_KEY`/`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` repo secrets) and publishes a `latest.json` manifest, which is what lets already-installed copies of Chronos find and verify this release automatically. Only versions from **0.3.0 onward** ship the updater itself, so 0.1.0/0.2.0 installs can't auto-update — people on those need to grab a new installer once, manually, after which auto-update takes over.
+
+## Auto-updates
+
+Chronos checks `github.com/RickCaleg/chronos/releases/latest` on launch and whenever you click **Check for updates** in Settings. Updates are downloaded and verified against a public key baked into the app before being installed — see [CONTRIBUTING.md](CONTRIBUTING.md#releasing) if you're maintaining a fork and need to re-key this.
 
 ## Data & backups
 
