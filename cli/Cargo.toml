@@ -1,6 +1,6 @@
 [package]
 name = "chronos-cli"
-version = "0.2.0"
+version = "0.3.0"
 description = "Command-line companion for the Chronos time tracker"
 authors = ["Richardson Calegari Saconi"]
 license = "MIT"
