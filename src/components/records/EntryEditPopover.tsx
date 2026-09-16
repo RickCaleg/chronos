@@ -1,0 +1,231 @@
+import { useState, type ClipboardEvent, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
+import { FloatingPanel } from "../ui/FloatingPanel";
+import { Input } from "../ui/Input";
+import { AutocompleteInput } from "../ui/AutocompleteInput";
+import { Button } from "../ui/Button";
+import { ProjectPicker } from "../timer/ProjectPicker";
+import type { TimeEntry } from "../../types";
+import {
+  addSeconds,
+  durationBetween,
+  formatDurationInput,
+  formatLocalDateTimeInput,
+  parseDurationInput,
+  parseLocalDateTimeInput,
+} from "../../lib/time";
+import type { EntryPatch } from "../../db/entries";
+import { useSuggestions } from "../../hooks/useSuggestions";
+import { useProjectsStore } from "../../store/useProjectsStore";
+import { matchProjectByAlias, parsePastedEntry } from "../../lib/pasteParser";
+
+interface EntryEditPopoverProps {
+  open: boolean;
+  onClose: () => void;
+  entry: TimeEntry;
+  onSave: (patch: EntryPatch) => void;
+  onDelete: () => void;
+}
+
+export function EntryEditPopover({ open, onClose, entry, onSave, onDelete }: EntryEditPopoverProps) {
+  const { t } = useTranslation();
+  const [description, setDescription] = useState(entry.description);
+  const [taskNumber, setTaskNumber] = useState(entry.taskNumber ?? "");
+  const [projectId, setProjectId] = useState<string | null>(entry.projectId);
+
+  const [start, setStart] = useState(entry.startTime);
+  const [end, setEnd] = useState(entry.endTime ?? entry.startTime);
+  const [startText, setStartText] = useState(formatLocalDateTimeInput(start));
+  const [endText, setEndText] = useState(formatLocalDateTimeInput(end));
+  const [durationText, setDurationText] = useState(
+    formatDurationInput(entry.durationSeconds ?? durationBetween(entry.startTime, end)),
+  );
+  const [startError, setStartError] = useState(false);
+  const [endError, setEndError] = useState(false);
+  const [durationError, setDurationError] = useState(false);
+  const { tasks, descriptions } = useSuggestions();
+  const { projects } = useProjectsStore();
+
+  if (!open) return null;
+
+  function handleEntryPaste(e: ClipboardEvent<HTMLInputElement>) {
+    const parsed = parsePastedEntry(e.clipboardData.getData("text"));
+    if (!parsed) return;
+    e.preventDefault();
+    setTaskNumber(parsed.taskNumber);
+    setDescription(parsed.description);
+    if (parsed.aliasToken) {
+      const matched = matchProjectByAlias(parsed.aliasToken, projects);
+      if (matched) setProjectId(matched.id);
+    }
+  }
+
+  const isFutureStart = new Date(start).getTime() > Date.now();
+  const isInvalidRange = new Date(end).getTime() <= new Date(start).getTime();
+  const hasErrors = startError || endError || durationError || isFutureStart || isInvalidRange;
+
+  function handleStartChange(value: string) {
+    setStartText(value);
+    const parsed = parseLocalDateTimeInput(value, start);
+    if (!parsed) return;
+    setStart(parsed);
+    setDurationText(formatDurationInput(durationBetween(parsed, end)));
+  }
+
+  function handleStartBlur() {
+    const parsed = parseLocalDateTimeInput(startText, start);
+    if (parsed) {
+      setStart(parsed);
+      setStartText(formatLocalDateTimeInput(parsed));
+      setDurationText(formatDurationInput(durationBetween(parsed, end)));
+      setStartError(false);
+    } else {
+      setStartError(true);
+    }
+  }
+
+  function handleEndChange(value: string) {
+    setEndText(value);
+    const parsed = parseLocalDateTimeInput(value, end);
+    if (!parsed) return;
+    setEnd(parsed);
+    setDurationText(formatDurationInput(durationBetween(start, parsed)));
+  }
+
+  function handleEndBlur() {
+    const parsed = parseLocalDateTimeInput(endText, end);
+    if (parsed) {
+      setEnd(parsed);
+      setEndText(formatLocalDateTimeInput(parsed));
+      setDurationText(formatDurationInput(durationBetween(start, parsed)));
+      setEndError(false);
+    } else {
+      setEndError(true);
+    }
+  }
+
+  function handleDurationChange(value: string) {
+    setDurationText(value);
+    const parsed = parseDurationInput(value);
+    if (parsed === null) return;
+    const newEnd = addSeconds(start, parsed);
+    setEnd(newEnd);
+    setEndText(formatLocalDateTimeInput(newEnd));
+  }
+
+  function handleDurationBlur() {
+    const parsed = parseDurationInput(durationText);
+    if (parsed !== null) {
+      setDurationText(formatDurationInput(parsed));
+      setDurationError(false);
+    } else {
+      setDurationError(true);
+    }
+  }
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (hasErrors) return;
+    onSave({
+      description,
+      taskNumber: taskNumber.trim() || null,
+      projectId,
+      startTime: start,
+      endTime: end,
+      durationSeconds: durationBetween(start, end),
+    });
+    onClose();
+  }
+
+  return (
+    <FloatingPanel open={open} onClose={onClose} align="right" className="w-80">
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-[var(--color-text-muted)]">
+            {t("editor.task")}
+          </label>
+          <AutocompleteInput value={taskNumber} onChange={setTaskNumber} suggestions={tasks} onPaste={handleEntryPaste} />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-[var(--color-text-muted)]">
+            {t("editor.description")}
+          </label>
+          <AutocompleteInput
+            value={description}
+            onChange={setDescription}
+            suggestions={descriptions}
+            onPaste={handleEntryPaste}
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-[var(--color-text-muted)]">
+            {t("editor.project")}
+          </label>
+          <ProjectPicker value={projectId} onChange={setProjectId} />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-[var(--color-text-muted)]">
+            {t("editor.start")}
+          </label>
+          <Input
+            value={startText}
+            onChange={(e) => handleStartChange(e.target.value)}
+            onBlur={handleStartBlur}
+            placeholder={t("editor.dateTimePlaceholder")}
+          />
+          {startError && <p className="mt-1 text-xs text-[var(--color-danger)]">{t("editor.invalidDateTime")}</p>}
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-[var(--color-text-muted)]">
+            {t("editor.end")}
+          </label>
+          <Input
+            value={endText}
+            onChange={(e) => handleEndChange(e.target.value)}
+            onBlur={handleEndBlur}
+            placeholder={t("editor.dateTimePlaceholder")}
+          />
+          {endError && <p className="mt-1 text-xs text-[var(--color-danger)]">{t("editor.invalidDateTime")}</p>}
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-[var(--color-text-muted)]">
+            {t("editor.duration")}
+          </label>
+          <Input
+            value={durationText}
+            onChange={(e) => handleDurationChange(e.target.value)}
+            onBlur={handleDurationBlur}
+            className="w-28"
+          />
+          {durationError && <p className="mt-1 text-xs text-[var(--color-danger)]">{t("editor.invalidDuration")}</p>}
+        </div>
+
+        {!startError && !endError && isFutureStart && (
+          <p className="text-xs text-[var(--color-danger)]">{t("editor.futureStart")}</p>
+        )}
+        {!startError && !endError && !isFutureStart && isInvalidRange && (
+          <p className="text-xs text-[var(--color-danger)]">{t("editor.invalidRange")}</p>
+        )}
+
+        <div className="flex items-center justify-between pt-1">
+          <Button type="button" size="sm" variant="danger" onClick={onDelete}>
+            {t("editor.delete")}
+          </Button>
+          <div className="flex gap-2">
+            <Button type="button" size="sm" variant="ghost" onClick={onClose}>
+              {t("editor.cancel")}
+            </Button>
+            <Button type="submit" size="sm" variant="primary" disabled={hasErrors}>
+              {t("editor.save")}
+            </Button>
+          </div>
+        </div>
+      </form>
+    </FloatingPanel>
+  );
+}
