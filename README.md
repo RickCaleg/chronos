@@ -17,6 +17,7 @@ A manual time tracker for people who just want to press play, work, and press st
 - **Paste autofill** — paste `#1234 - MRK - Fix login bug` into the task or description field and it splits into task, project, and description automatically. The same rule applies when importing CSVs.
 - **Group similar entries** — entries with the same task, description, and project on the same day collapse into one row with a total, expandable to see each session.
 - **Import / export** — full JSON backup, CSV export/import, and a dedicated Clockify CSV importer (matches Clockify's pt-BR export columns and applies the same paste-autofill rule to fill in task/project when they're embedded in the description).
+- **A real CLI** ([`chronos-cli`](docs/CLI.md)) — start/stop/list/edit entries, manage projects, export/import, and automate backups from a script, cron job, or a window-manager status bar widget. Reads and writes the same database as the GUI.
 - **Fully keyboard-driven** — `Ctrl+Enter` starts/stops the timer, `Alt+1/2/3` switches tabs, `Enter` saves in editors, `Esc` closes popovers, arrow keys navigate autocomplete.
 - **Bilingual** — English and Portuguese (pt-BR), switchable in Settings.
 - **Theme-aware** — light, dark, follows the OS, or (on Linux) follows your [Omarchy](https://omarchy.org) theme live.
@@ -50,6 +51,12 @@ npm run tauri build
 
 The installer/binary is produced under `src-tauri/target/release/bundle/`.
 
+This repo is a Cargo workspace with two Rust crates: `src-tauri` (the desktop app) and `cli` (the [`chronos-cli`](docs/CLI.md) companion). Build just the CLI with:
+
+```sh
+cargo build --release -p chronos-cli
+```
+
 ### Publishing a release
 
 Pushing a tag matching `v*` (e.g. `v0.1.0`) triggers the [release workflow](.github/workflows/release.yml), which builds installers for Linux and Windows and attaches them to a **draft** GitHub release for review before publishing:
@@ -67,6 +74,8 @@ Everything lives in a local SQLite database (in the OS's standard app-data direc
 - Export/import entries as CSV
 - Import directly from a Clockify CSV export
 - Erase everything and start fresh
+
+All of this is also available from the terminal — see [`docs/CLI.md`](docs/CLI.md) for the full `chronos-cli` reference, including automating backups with cron and wiring Chronos into a window-manager/Omarchy status bar.
 
 ## Contributing
 

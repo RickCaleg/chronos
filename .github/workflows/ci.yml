@@ -33,8 +33,6 @@ jobs:
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
 
       - name: Install npm dependencies
         run: npm ci
@@ -42,6 +40,8 @@ jobs:
       - name: Type-check and build frontend
         run: npm run build
 
-      - name: Check Rust backend
-        working-directory: src-tauri
-        run: cargo check
+      - name: Check Rust workspace (desktop app + CLI)
+        run: cargo check --workspace
+
+      - name: Run CLI tests
+        run: cargo test -p chronos-cli

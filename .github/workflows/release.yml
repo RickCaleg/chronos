@@ -36,11 +36,22 @@ jobs:
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
 
       - name: Install npm dependencies
         run: npm ci
+
+      - name: Build chronos-cli (release)
+        run: cargo build --release -p chronos-cli
+
+      - name: Stage chronos-cli binary for upload
+        shell: bash
+        run: |
+          mkdir -p dist-cli
+          if [ "${{ matrix.platform }}" = "windows-latest" ]; then
+            cp target/release/chronos-cli.exe dist-cli/chronos-cli-windows-x86_64.exe
+          else
+            cp target/release/chronos-cli dist-cli/chronos-cli-linux-x86_64
+          fi
 
       - uses: tauri-apps/tauri-action@v0
         env:
@@ -51,3 +62,9 @@ jobs:
           releaseBody: "See CHANGELOG or commit history for details."
           releaseDraft: true
           prerelease: false
+
+      - name: Attach chronos-cli binary to the release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: gh release upload "${{ github.ref_name }}" dist-cli/* --clobber --repo "${{ github.repository }}"

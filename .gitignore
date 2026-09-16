@@ -13,8 +13,9 @@ dist-ssr
 *.local
 
 # Rust / Tauri
-src-tauri/target
+target
 src-tauri/gen
+dist-cli
 
 # Editor directories and files
 .vscode/*
