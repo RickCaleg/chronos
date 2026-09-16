@@ -1,6 +1,6 @@
 [package]
 name = "chronos"
-version = "0.3.3"
+version = "0.3.4"
 description = "A manual, local-first time tracker built with Tauri and React."
 authors = ["Richardson Calegari Saconi"]
 license = "MIT"
@@ -18,6 +18,13 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+# sqlx-macros is a proc-macro crate, so Cargo resolves its dependency graph
+# (host-side) separately from the normal target graph — the [dependencies]
+# entry below only forces "bundled" for the runtime target build. Without
+# this duplicate here too, sqlx-macros' own copy of libsqlite3-sys still
+# links the system SQLite and can fail with the same `sqlite3_unlock_notify`
+# error even though the final binary's copy is bundled.
+libsqlite3-sys = { version = "0.28", features = ["bundled"] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
