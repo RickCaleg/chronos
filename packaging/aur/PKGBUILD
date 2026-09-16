@@ -9,7 +9,7 @@ license=('MIT')
 depends=('webkit2gtk-4.1' 'gtk3' 'hicolor-icon-theme' 'desktop-file-utils')
 makedepends=('rust' 'nodejs' 'npm')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/RickCaleg/chronos/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('9b0d450f440a36ff8a07a987062effce30f963e6835a71a1cc0569d0cf7df649')
+sha256sums=('468c3257640c014b0f6a89a4a4ccdee47b47ed8ba0a7d39d26539ec8a4e3c7bf')
 
 build() {
   cd "$pkgname-$pkgver"
