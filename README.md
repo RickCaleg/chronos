@@ -6,6 +6,8 @@ A manual time tracker for people who just want to press play, work, and press st
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-lightgrey)
 
+![Chronos screenshot](docs/screenshot.png)
+
 ## Features
 
 - **Manual timer** — description, optional task number, project, play/stop. Nothing automatic, nothing guessed.
