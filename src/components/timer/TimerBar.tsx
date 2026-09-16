@@ -1,4 +1,4 @@
-import { useEffect, useState, type ClipboardEvent, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Play, Square } from "lucide-react";
 import { useEntriesStore } from "../../store/useEntriesStore";
@@ -10,21 +10,26 @@ import { durationBetween, formatClock, nowIso } from "../../lib/time";
 import { cn } from "../../lib/cn";
 import { useSuggestions } from "../../hooks/useSuggestions";
 import { matchProjectByAlias, parsePastedEntry } from "../../lib/pasteParser";
+import { combineTaskDescription, splitTaskDescription } from "../../lib/taskDescription";
 
 export function TimerBar() {
   const { t } = useTranslation();
   const { runningEntry, start, stop, update, setRunningStart } = useEntriesStore();
   const { projects } = useProjectsStore();
-  const [description, setDescription] = useState("");
-  const [taskNumber, setTaskNumber] = useState("");
+  const [draft, setDraft] = useState("");
   const [projectId, setProjectId] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const { tasks, descriptions } = useSuggestions();
+  const suggestions = useSuggestions();
+  const suggestionByDisplay = useMemo(() => new Map(suggestions.map((s) => [s.display, s])), [suggestions]);
 
   const isRunning = !!runningEntry;
+  const combinedValue = isRunning ? combineTaskDescription(runningEntry.taskNumber, runningEntry.description) : draft;
 
   useEffect(() => {
-    if (!runningEntry) return;
+    if (!runningEntry) {
+      setElapsed(0);
+      return;
+    }
     const tick = () => setElapsed(durationBetween(runningEntry.startTime, nowIso()));
     tick();
     const id = setInterval(tick, 1000);
@@ -41,22 +46,33 @@ export function TimerBar() {
     }
     document.addEventListener("keydown", handleGlobalKeyDown);
     return () => document.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [isRunning, description, taskNumber, projectId]);
+  }, [isRunning, draft, projectId]);
 
   async function handleStart() {
-    await start({
-      description: description.trim(),
-      taskNumber: taskNumber.trim() || null,
-      projectId,
-      startTime: nowIso(),
-    });
-    setDescription("");
-    setTaskNumber("");
+    const { taskNumber, description } = splitTaskDescription(draft.trim());
+    await start({ description, taskNumber, projectId, startTime: nowIso() });
+    setDraft("");
     setProjectId(null);
   }
 
   function handleStartKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter" && !isRunning) handleStart();
+  }
+
+  function handleCombinedChange(raw: string) {
+    if (isRunning) {
+      const { taskNumber, description } = splitTaskDescription(raw);
+      update(runningEntry.id, { taskNumber, description });
+    } else {
+      setDraft(raw);
+    }
+  }
+
+  function handleSelectSuggestion(value: string) {
+    const match = suggestionByDisplay.get(value);
+    if (!match?.projectId) return;
+    if (isRunning) update(runningEntry.id, { projectId: match.projectId });
+    else setProjectId(match.projectId);
   }
 
   function handleEntryPaste(e: ClipboardEvent<HTMLInputElement>) {
@@ -71,8 +87,7 @@ export function TimerBar() {
         ...(matched ? { projectId: matched.id } : {}),
       });
     } else {
-      setTaskNumber(parsed.taskNumber);
-      setDescription(parsed.description);
+      setDraft(combineTaskDescription(parsed.taskNumber, parsed.description));
       if (matched) setProjectId(matched.id);
     }
   }
@@ -80,24 +95,14 @@ export function TimerBar() {
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
       <AutocompleteInput
-        value={isRunning ? runningEntry.taskNumber ?? "" : taskNumber}
-        onChange={(v) =>
-          isRunning ? update(runningEntry.id, { taskNumber: v || null }) : setTaskNumber(v)
-        }
+        value={combinedValue}
+        onChange={handleCombinedChange}
+        onSelect={handleSelectSuggestion}
         onKeyDown={handleStartKeyDown}
         onPaste={handleEntryPaste}
-        placeholder={t("timer.taskPlaceholder")}
-        suggestions={tasks}
-        className="w-24 shrink-0"
-      />
-      <AutocompleteInput
-        value={isRunning ? runningEntry.description : description}
-        onChange={(v) => (isRunning ? update(runningEntry.id, { description: v }) : setDescription(v))}
-        onKeyDown={handleStartKeyDown}
-        onPaste={handleEntryPaste}
-        placeholder={t("timer.descriptionPlaceholder")}
-        suggestions={descriptions}
-        className="min-w-[140px] flex-1 basis-40"
+        placeholder={t("timer.combinedPlaceholder")}
+        suggestions={suggestions.map((s) => s.display)}
+        className="min-w-[160px] flex-1"
       />
       <ProjectPicker
         value={isRunning ? runningEntry.projectId : projectId}

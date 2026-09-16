@@ -1,13 +1,13 @@
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Copy, Trash2 } from "lucide-react";
+import { Check, Copy, Play, Trash2 } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { confirm } from "@tauri-apps/plugin-dialog";
 import type { TimeEntry } from "../../types";
 import { useProjectsStore } from "../../store/useProjectsStore";
 import { useEntriesStore } from "../../store/useEntriesStore";
 import { EntryEditPopover } from "./EntryEditPopover";
-import { formatDurationHuman, formatTimeShort } from "../../lib/time";
+import { formatDurationHuman, formatTimeShort, nowIso } from "../../lib/time";
 import { projectLabel } from "../../lib/projectLabel";
 import i18n from "../../i18n";
 
@@ -17,7 +17,7 @@ const iconButtonClass =
 export function EntryRow({ entry }: { entry: TimeEntry }) {
   const { t } = useTranslation();
   const { projects } = useProjectsStore();
-  const { update, remove } = useEntriesStore();
+  const { update, remove, start, stop, runningEntry } = useEntriesStore();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -41,6 +41,16 @@ export function EntryRow({ entry }: { entry: TimeEntry }) {
     await writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function handleRestart() {
+    if (runningEntry) await stop();
+    await start({
+      description: entry.description,
+      taskNumber: entry.taskNumber,
+      projectId: entry.projectId,
+      startTime: nowIso(),
+    });
   }
 
   return (
@@ -83,6 +93,16 @@ export function EntryRow({ entry }: { entry: TimeEntry }) {
             {formatDurationHuman(entry.durationSeconds ?? 0)}
           </span>
         </span>
+      </button>
+
+      <button
+        type="button"
+        onClick={handleRestart}
+        aria-label={t("records.restart")}
+        title={t("records.restart")}
+        className={`${iconButtonClass} hover:text-[var(--color-accent)]`}
+      >
+        <Play size={14} />
       </button>
 
       <button type="button" onClick={handleCopy} aria-label={t("records.copy")} className={iconButtonClass}>

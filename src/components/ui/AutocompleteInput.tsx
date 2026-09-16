@@ -10,6 +10,8 @@ interface AutocompleteInputProps {
   className?: string;
   onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
   onPaste?: (e: ClipboardEvent<HTMLInputElement>) => void;
+  /** Called (in addition to onChange) only when a suggestion is explicitly picked, not on every keystroke. */
+  onSelect?: (value: string) => void;
 }
 
 export function AutocompleteInput({
@@ -20,6 +22,7 @@ export function AutocompleteInput({
   className,
   onKeyDown,
   onPaste,
+  onSelect,
 }: AutocompleteInputProps) {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
@@ -46,6 +49,7 @@ export function AutocompleteInput({
 
   function pick(suggestion: string) {
     onChange(suggestion);
+    onSelect?.(suggestion);
     setOpen(false);
   }
 

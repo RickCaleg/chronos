@@ -1,4 +1,4 @@
-import { useState, type ClipboardEvent, type FormEvent } from "react";
+import { useMemo, useState, type ClipboardEvent, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { FloatingPanel } from "../ui/FloatingPanel";
 import { Input } from "../ui/Input";
@@ -14,6 +14,7 @@ import {
   parseDurationInput,
   parseLocalDateTimeInput,
 } from "../../lib/time";
+import { combineTaskDescription, splitTaskDescription } from "../../lib/taskDescription";
 import type { EntryPatch } from "../../db/entries";
 import { useSuggestions } from "../../hooks/useSuggestions";
 import { useProjectsStore } from "../../store/useProjectsStore";
@@ -29,8 +30,7 @@ interface EntryEditPopoverProps {
 
 export function EntryEditPopover({ open, onClose, entry, onSave, onDelete }: EntryEditPopoverProps) {
   const { t } = useTranslation();
-  const [description, setDescription] = useState(entry.description);
-  const [taskNumber, setTaskNumber] = useState(entry.taskNumber ?? "");
+  const [draft, setDraft] = useState(combineTaskDescription(entry.taskNumber, entry.description));
   const [projectId, setProjectId] = useState<string | null>(entry.projectId);
 
   const [start, setStart] = useState(entry.startTime);
@@ -43,7 +43,8 @@ export function EntryEditPopover({ open, onClose, entry, onSave, onDelete }: Ent
   const [startError, setStartError] = useState(false);
   const [endError, setEndError] = useState(false);
   const [durationError, setDurationError] = useState(false);
-  const { tasks, descriptions } = useSuggestions();
+  const suggestions = useSuggestions();
+  const suggestionByDisplay = useMemo(() => new Map(suggestions.map((s) => [s.display, s])), [suggestions]);
   const { projects } = useProjectsStore();
 
   if (!open) return null;
@@ -52,12 +53,16 @@ export function EntryEditPopover({ open, onClose, entry, onSave, onDelete }: Ent
     const parsed = parsePastedEntry(e.clipboardData.getData("text"));
     if (!parsed) return;
     e.preventDefault();
-    setTaskNumber(parsed.taskNumber);
-    setDescription(parsed.description);
+    setDraft(combineTaskDescription(parsed.taskNumber, parsed.description));
     if (parsed.aliasToken) {
       const matched = matchProjectByAlias(parsed.aliasToken, projects);
       if (matched) setProjectId(matched.id);
     }
+  }
+
+  function handleSelectSuggestion(value: string) {
+    const match = suggestionByDisplay.get(value);
+    if (match?.projectId) setProjectId(match.projectId);
   }
 
   const isFutureStart = new Date(start).getTime() > Date.now();
@@ -126,9 +131,10 @@ export function EntryEditPopover({ open, onClose, entry, onSave, onDelete }: Ent
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (hasErrors) return;
+    const { taskNumber, description } = splitTaskDescription(draft.trim());
     onSave({
       description,
-      taskNumber: taskNumber.trim() || null,
+      taskNumber,
       projectId,
       startTime: start,
       endTime: end,
@@ -142,20 +148,15 @@ export function EntryEditPopover({ open, onClose, entry, onSave, onDelete }: Ent
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>
           <label className="mb-1 block text-xs font-medium text-[var(--color-text-muted)]">
-            {t("editor.task")}
-          </label>
-          <AutocompleteInput value={taskNumber} onChange={setTaskNumber} suggestions={tasks} onPaste={handleEntryPaste} />
-        </div>
-
-        <div>
-          <label className="mb-1 block text-xs font-medium text-[var(--color-text-muted)]">
-            {t("editor.description")}
+            {t("editor.taskDescription")}
           </label>
           <AutocompleteInput
-            value={description}
-            onChange={setDescription}
-            suggestions={descriptions}
+            value={draft}
+            onChange={setDraft}
+            onSelect={handleSelectSuggestion}
+            suggestions={suggestions.map((s) => s.display)}
             onPaste={handleEntryPaste}
+            placeholder={t("timer.combinedPlaceholder")}
           />
         </div>
 

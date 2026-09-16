@@ -1,27 +1,35 @@
 import { useMemo } from "react";
 import { useEntriesStore } from "../store/useEntriesStore";
+import { combineTaskDescription } from "../lib/taskDescription";
 
-/** Distinct, most-recent-first task numbers and descriptions already used, for autocomplete. */
-export function useSuggestions() {
+export interface EntrySuggestion {
+  /** What's shown in the dropdown and typed into the field, e.g. "#123 Fix login bug". */
+  display: string;
+  taskNumber: string | null;
+  description: string;
+  projectId: string | null;
+}
+
+/** Distinct, most-recent-first task+description combos already used, for autocomplete. */
+export function useSuggestions(): EntrySuggestion[] {
   const entries = useEntriesStore((s) => s.entries);
 
   return useMemo(() => {
-    const tasks: string[] = [];
-    const descriptions: string[] = [];
-    const seenTasks = new Set<string>();
-    const seenDescriptions = new Set<string>();
+    const seen = new Set<string>();
+    const result: EntrySuggestion[] = [];
 
     for (const entry of entries) {
-      if (entry.taskNumber && !seenTasks.has(entry.taskNumber)) {
-        seenTasks.add(entry.taskNumber);
-        tasks.push(entry.taskNumber);
-      }
-      if (entry.description && !seenDescriptions.has(entry.description)) {
-        seenDescriptions.add(entry.description);
-        descriptions.push(entry.description);
-      }
+      const display = combineTaskDescription(entry.taskNumber, entry.description);
+      if (!display || seen.has(display)) continue;
+      seen.add(display);
+      result.push({
+        display,
+        taskNumber: entry.taskNumber,
+        description: entry.description,
+        projectId: entry.projectId,
+      });
     }
 
-    return { tasks, descriptions };
+    return result;
   }, [entries]);
 }

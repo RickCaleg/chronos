@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronRight, Copy } from "lucide-react";
+import { Check, ChevronRight, Copy, Play } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import type { TimeEntry } from "../../types";
 import { useProjectsStore } from "../../store/useProjectsStore";
+import { useEntriesStore } from "../../store/useEntriesStore";
 import { EntryRow } from "./EntryRow";
-import { formatDurationHuman } from "../../lib/time";
+import { formatDurationHuman, nowIso } from "../../lib/time";
 import { projectLabel } from "../../lib/projectLabel";
 import { cn } from "../../lib/cn";
 
@@ -15,6 +16,7 @@ const iconButtonClass =
 export function GroupedEntryRow({ entries }: { entries: TimeEntry[] }) {
   const { t } = useTranslation();
   const { projects } = useProjectsStore();
+  const { start, stop, runningEntry } = useEntriesStore();
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -27,6 +29,16 @@ export function GroupedEntryRow({ entries }: { entries: TimeEntry[] }) {
     await writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function handleRestart() {
+    if (runningEntry) await stop();
+    await start({
+      description: first.description,
+      taskNumber: first.taskNumber,
+      projectId: first.projectId,
+      startTime: nowIso(),
+    });
   }
 
   return (
@@ -70,6 +82,16 @@ export function GroupedEntryRow({ entries }: { entries: TimeEntry[] }) {
 
             <span className="w-14 text-right font-mono text-sm tabular-nums">{formatDurationHuman(total)}</span>
           </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={handleRestart}
+          aria-label={t("records.restart")}
+          title={t("records.restart")}
+          className={`${iconButtonClass} hover:text-[var(--color-accent)]`}
+        >
+          <Play size={14} />
         </button>
 
         <button type="button" onClick={handleCopy} aria-label={t("records.copy")} className={iconButtonClass}>

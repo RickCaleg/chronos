@@ -6,8 +6,7 @@
     "settings": "Settings"
   },
   "timer": {
-    "descriptionPlaceholder": "What are you working on?",
-    "taskPlaceholder": "Task #",
+    "combinedPlaceholder": "What are you working on? Type # for a task number",
     "selectProject": "Select project",
     "start": "Start",
     "stop": "Stop",
@@ -23,11 +22,11 @@
     "noDescription": "(no description)",
     "deleteConfirm": "Delete this entry?",
     "copy": "Copy",
+    "restart": "Restart timer",
     "addManual": "Add manual entry"
   },
   "editor": {
-    "description": "Description",
-    "task": "Task #",
+    "taskDescription": "Task & description",
     "project": "Project",
     "start": "Start",
     "end": "End",

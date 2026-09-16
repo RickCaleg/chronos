@@ -6,8 +6,7 @@
     "settings": "Configurações"
   },
   "timer": {
-    "descriptionPlaceholder": "No que você está trabalhando?",
-    "taskPlaceholder": "Task #",
+    "combinedPlaceholder": "No que você está trabalhando? Digite # para número da task",
     "selectProject": "Selecionar projeto",
     "start": "Iniciar",
     "stop": "Parar",
@@ -23,11 +22,11 @@
     "noDescription": "(sem descrição)",
     "deleteConfirm": "Excluir este registro?",
     "copy": "Copiar",
+    "restart": "Reiniciar timer",
     "addManual": "Adicionar registro manual"
   },
   "editor": {
-    "description": "Descrição",
-    "task": "Task #",
+    "taskDescription": "Task e descrição",
     "project": "Projeto",
     "start": "Início",
     "end": "Fim",
