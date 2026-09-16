@@ -48,6 +48,15 @@ npm run tauri build
 
 The installer/binary is produced under `src-tauri/target/release/bundle/`.
 
+### Publishing a release
+
+Pushing a tag matching `v*` (e.g. `v0.1.0`) triggers the [release workflow](.github/workflows/release.yml), which builds installers for Linux and Windows and attaches them to a **draft** GitHub release for review before publishing:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
 ## Data & backups
 
 Everything lives in a local SQLite database (in the OS's standard app-data directory — nothing is ever synced or uploaded). Use **Settings → Data** to:
