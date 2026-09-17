@@ -28,11 +28,13 @@ export function RecordsView() {
     // shows up (with an empty entry list) so the day total can reflect it.
     if (runningDayKey && !map.has(runningDayKey)) map.set(runningDayKey, []);
 
-    return Array.from(map.entries()).map(([key, dayEntries]) => ({
-      key,
-      label: key === today ? ("today" as const) : key === yesterday ? ("yesterday" as const) : null,
-      items: groupSimilar ? groupSimilarEntries(dayEntries) : dayEntries,
-    }));
+    return Array.from(map.entries())
+      .sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0))
+      .map(([key, dayEntries]) => ({
+        key,
+        label: key === today ? ("today" as const) : key === yesterday ? ("yesterday" as const) : null,
+        items: groupSimilar ? groupSimilarEntries(dayEntries) : dayEntries,
+      }));
   }, [finished, groupSimilar, runningDayKey]);
 
   if (groups.length === 0) {

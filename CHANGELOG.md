@@ -4,6 +4,8 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Fixed
+- "Today" sorting last in the records list when it had no finished entries yet (only a running timer).
 
 ## [0.3.7] - 2026-09-17
 ### Fixed
