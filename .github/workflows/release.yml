@@ -40,6 +40,25 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Extract changelog section for this tag
+        id: changelog
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          body=$(awk -v ver="$version" '
+            $0 ~ "^## \\[" ver "\\]" { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md)
+          if [ -z "$body" ]; then
+            body="See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) or commit history for details."
+          fi
+          {
+            echo "body<<CHANGELOG_EOF"
+            echo "$body"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build chronos-cli (release)
         run: cargo build --release -p chronos-cli
 
@@ -61,7 +80,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Chronos ${{ github.ref_name }}"
-          releaseBody: "See CHANGELOG or commit history for details."
+          releaseBody: ${{ steps.changelog.outputs.body }}
           releaseDraft: true
           prerelease: false
 

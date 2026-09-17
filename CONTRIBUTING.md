@@ -22,6 +22,8 @@ You'll need Node.js 20+, a stable Rust toolchain, and the platform prerequisites
 
 ## Releasing
 
+Before tagging, move the [CHANGELOG.md](CHANGELOG.md) `[Unreleased]` entries under a new `## [x.y.z] - YYYY-MM-DD` heading (leave a fresh empty `[Unreleased]` above it). The release workflow extracts that section by tag version and uses it as the GitHub release body, so a release without a changelog entry just falls back to a generic "see commit history" message.
+
 See the [README](README.md#publishing-a-release) for the day-to-day `git tag` steps. The release workflow signs every build with a keypair generated via `tauri signer generate`; the private half lives only as the `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` repo secrets (plus a backup the maintainer keeps outside the repo — never commit it). The public half is the `pubkey` in `src-tauri/tauri.conf.json`'s `plugins.updater` config, which is not secret and is what every installed copy of Chronos uses to verify an update before installing it.
 
 If the private key is ever lost, generate a new pair, update the repo secrets and the `pubkey` in `tauri.conf.json`, and know that every previously-installed copy of Chronos will stop being able to verify new releases — they'd need a fresh manual install to pick up the new key.

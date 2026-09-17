@@ -1,0 +1,50 @@
+# Changelog
+
+All notable changes to Chronos are documented here. Format loosely follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [Unreleased]
+
+## [0.3.5] - 2026-09-16
+### Fixed
+- From-source Linux builds failing to link with `undefined symbol: sqlite3_unlock_notify`. `sqlx-sqlite` calls that function unconditionally, but it only exists in SQLite's amalgamation when compiled with `SQLITE_ENABLE_UNLOCK_NOTIFY` — `libsqlite3-sys`'s `bundled` feature doesn't set that by default. Added the `unlock_notify` feature alongside it.
+
+## [0.3.4] - 2026-09-16
+### Fixed
+- Attempted fix for the `sqlite3_unlock_notify` linking issue by also forcing `libsqlite3-sys`'s bundled feature under `[build-dependencies]` (superseded by the real fix in 0.3.5 — this alone wasn't sufficient).
+
+## [0.3.3] - 2026-09-16
+### Fixed
+- AppImage builds appearing roughly 2x too large on Omarchy/Hyprland (and other fractional-scaled Wayland compositors). The AppImage bundler forces `GDK_BACKEND=x11` to dodge an unrelated Wayland webview crash; under XWayland, `GDK_SCALE` stacks with the compositor's own auto-scaling for non-native clients. Now stripped when that x11 override is active.
+### Added
+- Documented installing on Arch Linux via the in-repo AUR `PKGBUILD` directly (`makepkg -si`), since AUR registration is temporarily closed.
+
+## [0.3.2] - 2026-09-16
+### Fixed
+- Editing the description/task while a timer was running didn't visually update the field (it updated the database but not the on-screen value, and could drop fast keystrokes).
+### Added
+- The current day's total now always includes the running timer's elapsed time, updating live.
+- A copy button on each day's header (visible on hover/focus) that copies a plain-text summary of that day's entries.
+
+## [0.3.1] - 2026-09-16
+### Fixed
+- Clean/from-scratch builds failing to link against the system SQLite (`undefined symbol: sqlite3_unlock_notify`) by forcing `libsqlite3-sys`'s `bundled` feature.
+### Added
+- `bundle.category` set in `tauri.conf.json` so the generated Linux `.desktop` file gets a proper freedesktop category.
+- Initial AUR packaging (`packaging/aur/PKGBUILD`).
+
+## [0.3.0]
+### Added
+- Auto-updates: Chronos checks GitHub Releases for new versions and can download/install them in-app.
+- Merged task-number + description into a single field with live `#` detection and autocomplete (selecting a suggestion also fills in the project).
+- A play/restart button on each history row to start a new timer from an existing entry.
+### Fixed
+- The running timer's elapsed counter not resetting after stopping.
+- The entry edit popover rendering underneath the top bar.
+
+## [0.2.0]
+### Added
+- `chronos-cli`, a standalone command-line companion for terminal use, scripted backups, and integrating Chronos into window-manager/Omarchy status bars. See `docs/CLI.md`.
+
+## [0.1.0]
+- First release: manual time tracking with start/stop and editable start/end/duration, projects, CSV/JSON import and export, English and Portuguese (pt-BR) localization, light/dark/Omarchy theming, and full keyboard operability.
