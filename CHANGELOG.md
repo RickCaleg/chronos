@@ -7,7 +7,8 @@ All notable changes to Chronos are documented here. Format loosely follows
 
 ## [0.3.6] - 2026-09-17
 ### Fixed
-- From-source Linux builds could still fail to link with `undefined symbol: sqlite3_unlock_notify`, deterministically, even with the 0.3.5 fix in place. Root cause: `libsqlite3-sys` 0.28's bundled build had a linking issue with `sqlx-macros` (a proc-macro, built via a separate compilation unit) that adding Cargo features couldn't work around. Fixed by updating `sqlx` to 0.8.6 (pulling in `libsqlite3-sys` 0.30.1) and `rusqlite` to 0.32.1 to match — verified with two independent from-scratch builds.
+- From-source Linux builds could still fail to link with `undefined symbol: sqlite3_unlock_notify`, even with the 0.3.5 fix in place. Updated `sqlx` to 0.8.6 (pulling in `libsqlite3-sys` 0.30.1) and `rusqlite` to 0.32.1 to match.
+- Building `chronos` and `sqlx-macros` (a proc-macro) each compile their own copy of bundled SQLite, and doing both in parallel is a genuine upstream race — it can still intermittently produce a linking error (missing `sqlite3_unlock_notify` or other basic SQLite symbols) even on 0.8.6, though noticeably less often. The AUR `PKGBUILD` (`packaging/aur/`, pkgrel 2) now builds single-threaded and retries a few times to work around it; there's no known way to eliminate the race outright.
 
 ## [0.3.5] - 2026-09-16
 ### Fixed

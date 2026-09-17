@@ -1,7 +1,7 @@
 # Maintainer: Richardson Calegari Saconi <richardson.saconi@outlook.com>
 pkgname=chronos
 pkgver=0.3.6
-pkgrel=1
+pkgrel=2
 pkgdesc="A manual, local-first time tracker with a CLI companion, built with Tauri and React"
 arch=('x86_64')
 url="https://github.com/RickCaleg/chronos"
@@ -9,18 +9,37 @@ license=('MIT')
 depends=('webkit2gtk-4.1' 'gtk3' 'hicolor-icon-theme' 'desktop-file-utils')
 makedepends=('rust' 'nodejs' 'npm')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/RickCaleg/chronos/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('aabaeab0d84b460b13c23ee40d1d85eb05baf69f33afe305cc95431f0fedf3cd')
+sha256sums=('a2eb0c65154c994d90faa513c2e6de39cb637d0bdaff54e5ab453a5a100b3793')
 
 build() {
   cd "$pkgname-$pkgver"
 
   npm ci
+
   # createUpdaterArtifacts is enabled in tauri.conf.json for the official
   # release pipeline, which signs builds with a private key that only
   # exists in that CI. Disable it here so a plain from-source build
   # (no signing keys available) doesn't fail; distro packages don't go
   # through the in-app updater anyway.
-  npm run tauri build -- --bundles deb --config '{"bundle":{"createUpdaterArtifacts":false}}'
+  #
+  # sqlx-macros (a proc-macro) and the app binary each get their own build
+  # of libsqlite3-sys's bundled SQLite. Compiling both is an upstream race:
+  # it intermittently produces a sqlx-macros.so missing basic SQLite
+  # symbols (seen: sqlite3_unlock_notify, sqlite3_bind_int64), even though
+  # both copies are correct in isolation and re-running the exact same
+  # command immediately after reliably succeeds. CARGO_BUILD_JOBS=1 cuts
+  # how often this happens (fewer builds racing at once) but does not
+  # eliminate it, so retry a few times rather than fail the whole package
+  # over a known upstream flake.
+  for attempt in 1 2 3; do
+    CARGO_BUILD_JOBS=1 npm run tauri build -- --bundles deb --config '{"bundle":{"createUpdaterArtifacts":false}}' && break
+    if [ "$attempt" = 3 ]; then
+      echo "tauri build failed 3 times in a row (not just the known sqlite3_unlock_notify/sqlite3_bind_int64 flake) — giving up." >&2
+      exit 1
+    fi
+    echo "tauri build failed (attempt $attempt/3, likely the known sqlx/libsqlite3-sys race) — retrying..." >&2
+  done
+
   cargo build --release --locked -p chronos-cli
 }
 
