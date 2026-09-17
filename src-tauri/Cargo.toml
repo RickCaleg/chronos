@@ -1,6 +1,6 @@
 [package]
 name = "chronos"
-version = "0.3.6"
+version = "0.3.7"
 description = "A manual, local-first time tracker built with Tauri and React."
 authors = ["Richardson Calegari Saconi"]
 license = "MIT"

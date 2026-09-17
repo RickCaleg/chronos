@@ -5,10 +5,17 @@ All notable changes to Chronos are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-09-17
+### Fixed
+- The AUR `PKGBUILD` (`packaging/aur/`) reliably failed to build under `makepkg` specifically (never with a plain `cargo`/`npm` toolchain): `makepkg.conf`'s injected `RUSTFLAGS` (debug-info/frame-pointer flags, for its automatic debug-package splitting) and LTO-enabled `LDFLAGS`/`CFLAGS`/`CXXFLAGS` broke linking of any binary here that embeds bundled SQLite (the app itself, `sqlx-macros`, and `chronos-cli`), producing `undefined symbol` errors for basic SQLite functions. The 0.3.5/0.3.6 `sqlx`/`libsqlite3-sys` version bumps were real fixes for a related but different bug — this was the actual cause of builds still failing afterward. The `PKGBUILD` now unsets those variables for its build steps.
+- A `package()` bug in the same `PKGBUILD` (missing `mkdir` before extracting the bundled `.deb`) that would fail even after the build itself succeeded.
+- Switched `PKGBUILD`'s source from a GitHub-generated tarball to a git clone pinned to the release tag, since GitHub doesn't guarantee those tarball checksums stay stable and a downloaded release archive could otherwise carry a stale copy of packaging fixes made after that tag existed.
+
+This release contains no app code changes — 0.3.6's functionality is identical — it exists solely so the current release has a working `PKGBUILD` bundled in it.
+
 ## [0.3.6] - 2026-09-17
 ### Fixed
 - From-source Linux builds could still fail to link with `undefined symbol: sqlite3_unlock_notify`, even with the 0.3.5 fix in place. Updated `sqlx` to 0.8.6 (pulling in `libsqlite3-sys` 0.30.1) and `rusqlite` to 0.32.1 to match.
-- Building `chronos` and `sqlx-macros` (a proc-macro) each compile their own copy of bundled SQLite, and doing both in parallel is a genuine upstream race — it can still intermittently produce a linking error (missing `sqlite3_unlock_notify` or other basic SQLite symbols) even on 0.8.6, though noticeably less often. The AUR `PKGBUILD` (`packaging/aur/`, pkgrel 2) now builds single-threaded and retries a few times to work around it; there's no known way to eliminate the race outright.
 
 ## [0.3.5] - 2026-09-16
 ### Fixed

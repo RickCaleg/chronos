@@ -4,58 +4,58 @@
 # new app release/tag. If you got this PKGBUILD from inside a downloaded
 # release archive/zip instead of `git clone`, it may be stale — compare
 # pkgrel against https://github.com/RickCaleg/chronos/blob/master/packaging/aur/PKGBUILD
+#
+# Source is a git clone (not a GitHub-generated tarball): GitHub doesn't
+# guarantee those archive checksums stay stable long-term, and a git tag
+# clone sidesteps that entirely — makepkg verifies it via git itself, so
+# sha256sums is intentionally SKIP here (standard for VCS sources).
 pkgname=chronos
-pkgver=0.3.6
-pkgrel=2
+pkgver=0.3.7
+pkgrel=1
 pkgdesc="A manual, local-first time tracker with a CLI companion, built with Tauri and React"
 arch=('x86_64')
 url="https://github.com/RickCaleg/chronos"
 license=('MIT')
 depends=('webkit2gtk-4.1' 'gtk3' 'hicolor-icon-theme' 'desktop-file-utils')
-makedepends=('rust' 'nodejs' 'npm')
-source=("$pkgname-$pkgver.tar.gz::https://github.com/RickCaleg/chronos/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('a2eb0c65154c994d90faa513c2e6de39cb637d0bdaff54e5ab453a5a100b3793')
+makedepends=('rust' 'nodejs' 'npm' 'git')
+source=("$pkgname::git+https://github.com/RickCaleg/chronos.git#tag=v$pkgver")
+sha256sums=('SKIP')
 
 build() {
-  cd "$pkgname-$pkgver"
+  cd "$pkgname"
 
   npm ci
+
+  # makepkg injects RUSTFLAGS (-C force-frame-pointers=yes -C debuginfo=2
+  # --remap-path-prefix=..., for its automatic debug-package splitting) and
+  # LTO-enabled LDFLAGS/CFLAGS/CXXFLAGS. Any binary here that links a
+  # cc-crate-bundled C library (libsqlite3-sys, via sqlx-macros, the app
+  # binary, and chronos-cli/rusqlite) ends up missing basic SQLite symbols
+  # under those flags (seen: sqlite3_unlock_notify, sqlite3_bind_int64,
+  # sqlite3_bind_text, ...) — reproduced consistently under makepkg's
+  # environment, never with a plain `cargo`/`npm` toolchain. Unset them for
+  # both build commands below.
+  unset RUSTFLAGS LDFLAGS CFLAGS CXXFLAGS
 
   # createUpdaterArtifacts is enabled in tauri.conf.json for the official
   # release pipeline, which signs builds with a private key that only
   # exists in that CI. Disable it here so a plain from-source build
   # (no signing keys available) doesn't fail; distro packages don't go
   # through the in-app updater anyway.
-  #
-  # sqlx-macros (a proc-macro) and the app binary each get their own build
-  # of libsqlite3-sys's bundled SQLite. Compiling both is an upstream race:
-  # it intermittently produces a sqlx-macros.so missing basic SQLite
-  # symbols (seen: sqlite3_unlock_notify, sqlite3_bind_int64), even though
-  # both copies are correct in isolation and re-running the exact same
-  # command immediately after reliably succeeds. CARGO_BUILD_JOBS=1 cuts
-  # how often this happens (fewer builds racing at once) but does not
-  # eliminate it, so retry a few times rather than fail the whole package
-  # over a known upstream flake.
-  for attempt in 1 2 3; do
-    CARGO_BUILD_JOBS=1 npm run tauri build -- --bundles deb --config '{"bundle":{"createUpdaterArtifacts":false}}' && break
-    if [ "$attempt" = 3 ]; then
-      echo "tauri build failed 3 times in a row (not just the known sqlite3_unlock_notify/sqlite3_bind_int64 flake) — giving up." >&2
-      exit 1
-    fi
-    echo "tauri build failed (attempt $attempt/3, likely the known sqlx/libsqlite3-sys race) — retrying..." >&2
-  done
+  npm run tauri build -- --bundles deb --config '{"bundle":{"createUpdaterArtifacts":false}}'
 
   cargo build --release --locked -p chronos-cli
 }
 
 package() {
-  cd "$pkgname-$pkgver"
+  cd "$pkgname"
 
   # The .deb Tauri builds already has the correct FHS layout (binary,
   # hicolor icons, .desktop file) generated straight from tauri.conf.json —
   # unpack it instead of hand-maintaining a duplicate of that metadata here.
   local debfile
   debfile=$(find target/release/bundle/deb -name '*.deb')
+  mkdir -p "$srcdir/deb-extract"
   ar x "$debfile" --output="$srcdir/deb-extract"
   bsdtar -xf "$srcdir"/deb-extract/data.tar.* -C "$pkgdir"
 
