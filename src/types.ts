@@ -25,6 +25,8 @@ export interface TimeEntry {
   createdAt: string;
   updatedAt: string;
   tags: Tag[];
+  proofhubTimeEntryId: string | null;
+  proofhubSyncedAt: string | null;
 }
 
 export interface Backup {

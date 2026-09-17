@@ -142,5 +142,31 @@
     "cancel": "Cancelar",
     "confirm": "Confirmar",
     "close": "Fechar"
+  },
+  "proofhub": {
+    "title": "ProofHub",
+    "description": "Envie as horas lançadas para projetos e tarefas do ProofHub. Nada relacionado a isso é baixado ou contatado até você instalar.",
+    "install": "Instalar",
+    "uninstall": "Desinstalar",
+    "subdomain": "Subdomínio do ProofHub",
+    "apiKey": "Chave de API",
+    "apiKeyHint": "No ProofHub: ícone de perfil (canto inferior esquerdo) → API access.",
+    "apiKeyPlaceholder": "Cole sua chave de API do ProofHub",
+    "connect": "Testar e conectar",
+    "connectedTo": "Conectado a {{subdomain}}.proofhub.com",
+    "disconnect": "Desconectar",
+    "noProjects": "Ainda não há projetos ativos para mapear.",
+    "selectProject": "Projeto no ProofHub…",
+    "selectTimesheet": "Timesheet…",
+    "createTimesheet": "Criar \"Chronos time\"",
+    "defaultTimesheetTitle": "Chronos time",
+    "billableByDefault": "Faturável por padrão",
+    "unmap": "Remover mapeamento",
+    "sendToProofHub": "Enviar para o ProofHub",
+    "sending": "Enviando…",
+    "synced": "Sincronizado com o ProofHub",
+    "sendDay": "Enviar dia para o ProofHub",
+    "sendDayConfirm": "Enviar {{count}} registros ({{hours}} no total) para o ProofHub?",
+    "sendDayPartialFailure": "{{count}} registros não puderam ser enviados — confira individualmente."
   }
 }

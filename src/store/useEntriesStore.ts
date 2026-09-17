@@ -77,6 +77,8 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
       ...(patch.startTime !== undefined ? { startTime: patch.startTime } : {}),
       ...(patch.endTime !== undefined ? { endTime: patch.endTime } : {}),
       ...(patch.durationSeconds !== undefined ? { durationSeconds: patch.durationSeconds } : {}),
+      ...(patch.proofhubTimeEntryId !== undefined ? { proofhubTimeEntryId: patch.proofhubTimeEntryId } : {}),
+      ...(patch.proofhubSyncedAt !== undefined ? { proofhubSyncedAt: patch.proofhubSyncedAt } : {}),
     });
     // Apply optimistically, before the DB round-trip: the running entry's
     // description field is bound directly to this store, so waiting for

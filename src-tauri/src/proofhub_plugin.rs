@@ -140,26 +140,47 @@ pub fn proofhub_plugin_uninstall(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// The single generic bridge every ProofHub-aware UI action goes through.
-/// `action`/`payload` describe the request (see proofhub-plugin/src/main.rs
-/// for the exact shapes); credentials are injected here, server-side, from
-/// the encrypted store — the frontend never has access to them.
+/// The single generic bridge every ProofHub-aware UI action goes through,
+/// using the currently *saved* credentials. `action`/`payload` describe the
+/// request (see proofhub-plugin/src/main.rs for the exact shapes);
+/// credentials are injected here, server-side, from the encrypted store —
+/// the frontend never has access to them.
 #[tauri::command]
 pub fn proofhub_plugin_call(app: AppHandle, action: String, payload: Value) -> Result<Value, String> {
-    let path = binary_path(&app)?;
+    let creds = proofhub_credentials::load_credentials(&app)?
+        .ok_or_else(|| "ProofHub isn't connected yet.".to_string())?;
+    run_plugin(&app, &action, payload, &creds.subdomain, &creds.api_key)
+}
+
+/// Tests a subdomain/API key pair *without* touching the saved credentials
+/// — used by the "Test & connect" button in Settings so a bad key never
+/// gets saved as if it were connected. The caller saves the credentials
+/// itself (`proofhub_save_credentials`) only after this succeeds.
+#[tauri::command]
+pub fn proofhub_test_connection(app: AppHandle, subdomain: String, api_key: String) -> Result<(), String> {
+    run_plugin(&app, "test-connection", Value::Object(serde_json::Map::new()), &subdomain, &api_key)
+        .map(|_| ())
+}
+
+fn run_plugin(
+    app: &AppHandle,
+    action: &str,
+    payload: Value,
+    subdomain: &str,
+    api_key: &str,
+) -> Result<Value, String> {
+    let path = binary_path(app)?;
     if !path.exists() {
         return Err("The ProofHub plugin isn't installed.".to_string());
     }
-    let creds = proofhub_credentials::load_credentials(&app)?
-        .ok_or_else(|| "ProofHub isn't connected yet.".to_string())?;
 
     let mut request = match payload {
         Value::Object(map) => map,
         _ => serde_json::Map::new(),
     };
-    request.insert("action".to_string(), Value::String(action));
-    request.insert("subdomain".to_string(), Value::String(creds.subdomain));
-    request.insert("apiKey".to_string(), Value::String(creds.api_key));
+    request.insert("action".to_string(), Value::String(action.to_string()));
+    request.insert("subdomain".to_string(), Value::String(subdomain.to_string()));
+    request.insert("apiKey".to_string(), Value::String(api_key.to_string()));
 
     let mut child = Command::new(&path)
         .stdin(Stdio::piped())

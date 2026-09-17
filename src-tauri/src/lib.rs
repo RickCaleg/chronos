@@ -240,6 +240,7 @@ pub fn run() {
             proofhub_plugin::proofhub_plugin_install,
             proofhub_plugin::proofhub_plugin_uninstall,
             proofhub_plugin::proofhub_plugin_call,
+            proofhub_plugin::proofhub_test_connection,
             proofhub_credentials::proofhub_save_credentials,
             proofhub_credentials::proofhub_connection_status,
             proofhub_credentials::proofhub_clear_credentials,
