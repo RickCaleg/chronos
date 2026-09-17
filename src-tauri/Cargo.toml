@@ -40,6 +40,17 @@ tauri-plugin-process = "2.3.1"
 tauri-plugin-global-shortcut = "2.3.2"
 tauri-plugin-autostart = "2.5.1"
 
+# ProofHub integration (docs/proofhub-integration.md): downloading and
+# signature-verifying the separate chronos-proofhub-plugin binary, and
+# encrypting its credentials at rest. rustls-tls (not the default
+# OpenSSL-backed TLS) for the same reason as the plugin binary itself —
+# avoiding another native-linking surface after the SQLite/appindicator
+# lessons from earlier releases.
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+minisign-verify = "0.2"
+aes-gcm = "0.10"
+rand = "0.8"
+
 # tauri-plugin-sql's sqlite feature links the system libsqlite3 by default,
 # which is fragile across distros (e.g. a clean build failed on Arch with an
 # undefined `sqlite3_unlock_notify` symbol). Force the vendored/bundled

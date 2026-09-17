@@ -1,0 +1,22 @@
+[package]
+name = "chronos-proofhub-plugin"
+version = "0.4.0"
+description = "Standalone ProofHub API bridge for Chronos, downloaded on demand by the desktop app"
+authors = ["Richardson Calegari Saconi"]
+license = "MIT"
+repository = "https://github.com/RickCaleg/chronos"
+edition = "2021"
+
+[[bin]]
+name = "chronos-proofhub-plugin"
+path = "src/main.rs"
+
+[dependencies]
+# rustls-tls instead of the default (OpenSSL-backed) TLS: this project has
+# already been burned repeatedly by native C-library linking quirks across
+# distros/build environments (bundled SQLite under makepkg, libayatana-
+# appindicator) — rustls avoids adding another one for a binary that gets
+# auto-downloaded and executed, not just built once in CI.
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

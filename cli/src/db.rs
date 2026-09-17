@@ -86,5 +86,17 @@ fn ensure_schema(conn: &Connection) -> Result<()> {
         conn.execute("ALTER TABLE projects ADD COLUMN alias TEXT", [])?;
     }
 
+    // Safety net for a database created before the ProofHub sync-tracking
+    // columns existed. The CLI never populates or reads these — this is
+    // purely to keep the schema shape consistent for a database the CLI
+    // might create first (see docs/proofhub-integration.md section 4.1).
+    let has_proofhub_sync: bool = conn
+        .prepare("SELECT 1 FROM pragma_table_info('time_entries') WHERE name = 'proofhub_synced_at'")?
+        .exists([])?;
+    if !has_proofhub_sync {
+        conn.execute("ALTER TABLE time_entries ADD COLUMN proofhub_time_entry_id TEXT", [])?;
+        conn.execute("ALTER TABLE time_entries ADD COLUMN proofhub_synced_at TEXT", [])?;
+    }
+
     Ok(())
 }

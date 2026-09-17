@@ -8,6 +8,9 @@ use tauri::{Emitter, Manager, WindowEvent};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_sql::{Migration, MigrationKind};
 
+mod proofhub_credentials;
+mod proofhub_plugin;
+
 /// Set once the user actually asked to quit (tray menu, or a future explicit
 /// shortcut) so the window-close handler below knows to let the app exit
 /// instead of hiding to the tray.
@@ -152,6 +155,15 @@ fn migrations() -> Vec<Migration> {
             "#,
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 4,
+            description: "add_proofhub_sync_tracking",
+            sql: r#"
+                ALTER TABLE time_entries ADD COLUMN proofhub_time_entry_id TEXT;
+                ALTER TABLE time_entries ADD COLUMN proofhub_synced_at TEXT;
+            "#,
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -224,6 +236,13 @@ pub fn run() {
             set_tray_timer_label,
             register_global_shortcut,
             unregister_global_shortcut,
+            proofhub_plugin::proofhub_plugin_status,
+            proofhub_plugin::proofhub_plugin_install,
+            proofhub_plugin::proofhub_plugin_uninstall,
+            proofhub_plugin::proofhub_plugin_call,
+            proofhub_credentials::proofhub_save_credentials,
+            proofhub_credentials::proofhub_connection_status,
+            proofhub_credentials::proofhub_clear_credentials,
         ])
         .setup(move |app| {
             let show_item = MenuItem::with_id(app, "show", "Show Chronos", true, None::<&str>)?;
