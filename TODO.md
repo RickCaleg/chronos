@@ -38,3 +38,11 @@ to their start/end time) for reviewing a week at a glance.
 - The most expensive UI to build on this list — custom layout, not a
   reusable pattern from elsewhere in the app.
 - See open question under #1 about where this lives in the nav.
+
+## 4. ProofHub integration (optional, planned)
+
+Push logged Chronos time entries into ProofHub projects/tasks. Full design
+— API research, data model, credential storage, settings UX, phased
+rollout — is written up in
+[docs/proofhub-integration.md](docs/proofhub-integration.md). Not yet
+scheduled into a release; planning-only until that changes.
