@@ -1,10 +1,8 @@
 # ProofHub integration — design & implementation plan
 
-Status: **planning only, nothing implemented yet.** This document is the
-detailed design for an optional "plugin" that pushes logged Chronos time
-entries into ProofHub projects/tasks. It exists so implementation can proceed
-in reviewable phases without re-deriving the ProofHub API shape or the
-security tradeoffs each time.
+Status: **in development on `feature/proofhub-integration`, targeting
+v0.5.0.** This document is the detailed design for an optional "plugin"
+that pushes logged Chronos time entries into ProofHub projects/tasks.
 
 ## 1. Goal and scope
 
@@ -19,14 +17,15 @@ tracker:
 - **User-triggered pushes, not automatic.** Matches how Chronos treats every
   other write today (starting/stopping timers, saving edits) — nothing
   happens to a user's ProofHub account without an explicit click.
-- **Opt-in and invisible when off.** A user who never enables it should see
-  no new UI, no extra settings clutter, no network calls, no extra rows in
-  exports.
+- **Nothing on disk, in memory, or on the network for this feature until the
+  user explicitly installs it**, and nothing about ProofHub's API/protocol
+  shipped in the base Chronos binary at all — not just dormant, genuinely
+  absent until downloaded. See §3.
 
 This is the second deliberate exception to "local-first, no telemetry" after
 the GitHub-releases updater (documented in `CONTRIBUTING.md`) — it must be
-presented the same way: off by default, one clear toggle, and a documented
-statement of exactly what leaves the device and to where.
+presented the same way: off by default, one clear action to opt in, and a
+documented statement of exactly what leaves the device and to where.
 
 ## 2. ProofHub's actual API (researched, not assumed)
 
@@ -107,31 +106,162 @@ project must therefore hold a **timesheet id**, not just a project id.
 
 **25 requests / 10 seconds** per account+IP (from the official README). Over
 that, ProofHub returns `429` with a `Retry-After` header. Batch pushes (see
-§7.2) must serialize requests with a small delay and honor `Retry-After` on
-a `429` rather than hammering it — at 25/10s a day's worth of entries (a
-handful) will never realistically hit this, but a "push everything since I
-started using Chronos" bulk backfill could.
+§8.2) must serialize requests with a small delay and honor `Retry-After` on
+a `429` rather than hammering it.
 
 ### 2.4 What's not there
 
-- **No webhooks.** Confirmed absent from the official docs — any sync stays
-  one-way and pull-free; nothing to design around for ProofHub-initiated
-  events.
-- **No official SDK or maintained client library** in any language, and no
-  public Postman collection. Chronos calls the REST endpoints directly;
-  there's no wrapper crate to depend on.
-- **CORS is a non-issue**, because these calls belong in the Rust backend
-  (a new `#[tauri::command]`, the same shape as the existing updater's
-  GitHub Releases call), never in the webview's JS context.
+- **No webhooks.** Confirmed absent from the official docs.
+- **No official SDK or maintained client library**, no public Postman
+  collection.
 
-## 3. Data model changes
+## 3. Plugin distribution architecture
+
+This is the part that makes it a real "plugin" rather than a hidden switch
+in the same binary. The requirement: **before the user clicks Install,
+nothing related to ProofHub exists on their machine** — no ProofHub API
+code, no credential file, no settings rows, no processes, no network
+calls. After careful consideration, the design below is a separately
+compiled, separately downloaded, signature-verified binary — not a
+dynamically-loaded library and not a WASM module. Both of those were
+considered and rejected for concrete reasons (below); the chosen shape is
+deliberately closer to "download a small trusted CLI tool," which this
+project already has a working, low-risk precedent for.
+
+### 3.1 Why not a native dylib or WASM module
+
+- **Native dylib (`.so`/`.dylib`/`.dll`) loaded into the running app**:
+  rejected. Rust has no stable ABI across compiler versions — a plugin
+  binary and the host app would have to be built with the *exact* same
+  rustc version/flags per platform/arch or risk undefined behavior (silent
+  memory corruption, not just a crash) on mismatch. That's a categorically
+  worse failure mode than every native-linking bug this project has already
+  fought (bundled SQLite under `makepkg`, `libayatana-appindicator`) —
+  those failed loudly at build/link time; an ABI-mismatched dylib can fail
+  silently at runtime, in a shipped release, on a user's machine.
+- **WASM module loaded via an embedded runtime** (`wasmtime`/`wasmer`):
+  safer than a dylib, but it means embedding a WASM runtime in the base app
+  (a new, fairly heavy dependency, present whether or not anyone ever
+  installs the plugin — which itself sits oddly with "nothing until
+  install"), designing a host/guest interface from scratch, and it still
+  doesn't solve how the plugin would contribute *UI* (a WASM module can't
+  render React) — that problem would need a second system (module
+  federation / dynamically loaded JS) layered on top. Rejected as
+  disproportionate engineering for one integration.
+- **Separate downloaded process, talked to over stdio (chosen)**: no ABI
+  concerns (it's a full separate process with its own memory space, exactly
+  like spawning any other external program), no new runtime embedded in
+  the base app, and this project already has the identical shape working
+  in production — `chronos-cli` is already a standalone binary, already
+  built per-platform in CI, already published as a plain GitHub Release
+  asset (see `.github/workflows/release.yml`'s `chronos-cli` staging
+  step). The plugin reuses that exact pattern; it just gets downloaded
+  automatically by the app instead of manually by the user, which is why
+  it additionally needs signature verification (see §3.4) that
+  `chronos-cli` doesn't bother with — a user manually downloading and
+  running `chronos-cli` themselves is a different trust model than the app
+  auto-fetching and executing a binary on a button click.
+
+### 3.2 The plugin binary: `chronos-proofhub-plugin`
+
+A new Cargo workspace member, `proofhub-plugin/`, alongside `src-tauri` and
+`cli`. It is a small, stateless CLI: **one invocation per action.** It
+reads a single JSON payload from stdin, makes the corresponding ProofHub
+API call(s), and writes a single JSON envelope to stdout, then exits.
+
+```
+$ echo '{"action":"list-projects","subdomain":"acmecorp","apiKey":"..."}' \
+    | chronos-proofhub-plugin
+{"ok":true,"data":[{"id":"123","title":"Website redesign"}, ...]}
+```
+
+Envelope shape on failure: `{"ok":false,"error":{"status":401,"message":"..."}}`
+so the main app can distinguish auth failures, rate limits, and validation
+errors (§9) without parsing ProofHub's raw response body itself.
+
+Actions, matching §2.2's endpoints one-to-one: `test-connection`,
+`list-projects`, `list-timesheets`, `create-timesheet`, `list-todolists`,
+`list-tasks`, `push-entry`, `update-entry`.
+
+Deliberately **no database access and no credential storage** in this
+binary — it only knows how to talk to ProofHub, given credentials handed to
+it on stdin for that single call. This keeps its dependency footprint small
+(`reqwest` with `rustls-tls` — no OpenSSL system dependency to fight,
+`serde`/`serde_json`, nothing else) and means a compromised or buggy plugin
+binary can't itself go read `chronos.db` or the credential file — it never
+has a path to either.
+
+### 3.3 Install / uninstall flow (main app, Rust side)
+
+New module `src-tauri/src/proofhub_plugin.rs`:
+
+- `#[tauri::command] proofhub_plugin_status() -> PluginStatus` — reports
+  `NotInstalled`, `Installed { version }`, so Settings knows whether to show
+  "Install" or the connect form.
+- `#[tauri::command] proofhub_plugin_install(app) -> Result<(), String>`:
+  1. Resolves the platform triple (matching the two platforms Chronos
+     itself already ships for — Linux x86_64, Windows x86_64; no new
+     platform support invented here).
+  2. Downloads `chronos-proofhub-plugin-{platform}` and its `.minisig`
+     signature from **the same GitHub Release tag as the running app's own
+     version** (`.../releases/download/v{currentVersion}/...`) — this is
+     what keeps the plugin's protocol in lockstep with the app without
+     needing any separate version-negotiation logic: a v0.5.0 app only ever
+     fetches the v0.5.0 plugin.
+  3. Verifies the signature with the `minisign-verify` crate against a
+     public key embedded as a Rust constant (§3.4) — refuses to proceed on
+     a mismatch, deletes the downloaded file, and surfaces a clear error.
+  4. Writes the verified binary to the app's data directory (e.g.
+     `~/.local/share/com.richardson.chronos/plugins/` on Linux), `chmod
+     755` on Unix.
+  5. Records the installed version in the `settings` table (§4.2).
+- `#[tauri::command] proofhub_plugin_uninstall()`: deletes the binary and
+  the installed-version row. Does **not** touch already-synced entries'
+  `proofhub_time_entry_id`/`proofhub_synced_at` (§4.1) or a previously
+  saved credential unless the user separately chooses "Disconnect" (§6.4)
+  — uninstalling the plugin and disconnecting the account are related but
+  distinct actions.
+- `#[tauri::command] proofhub_plugin_call(action, payload) -> Result<Value, PluginError>`:
+  the single generic bridge every ProofHub-aware UI action goes through.
+  Spawns the installed binary, writes `payload` (merged with the decrypted
+  credential, see §5) to its stdin, reads stdout, parses the envelope.
+  Treats "binary missing," "non-zero exit," and "unparseable stdout" as
+  distinct error cases surfaced to the UI (§9) rather than lumped together.
+
+This collapses what an earlier draft of this plan had as ~9 separate
+Tauri commands (`proofhub_list_projects`, `proofhub_push_entry`, ...) into
+one generic bridge plus the three lifecycle commands above — all
+ProofHub-specific request/response shapes live in the downloaded binary,
+not in the base app.
+
+### 3.4 Signing
+
+A **dedicated** minisign keypair, separate from the app's existing
+auto-updater signing key (`TAURI_SIGNING_PRIVATE_KEY`) — a different key so
+a compromise of one can't be leveraged against the other. Generated the
+same way the existing updater key was (`npx tauri signer generate`, which
+this project already has working tooling for). The private key + password
+become two new repo secrets; the public key is embedded as a constant in
+`src-tauri/src/proofhub_plugin.rs`. **Generating and committing this
+keypair to GitHub's repo secrets is a one-time, security-relevant action —
+done as an explicit, confirmed step, not silently, same as any other change
+to shared secrets.**
+
+CI (`release.yml`) gets a new step alongside the existing `chronos-cli`
+build: build `proofhub-plugin` in release mode for each platform in the
+matrix, sign each binary with the new key (`minisign-cli`, installed via
+`cargo install minisign-cli` so the step is identical across the
+`ubuntu-latest`/`windows-latest` runners rather than depending on an OS
+package manager), and upload both the binary and its `.minisig` as extra
+release assets — mirroring the existing `chronos-cli` staging step exactly.
+
+## 4. Data model changes
 
 Two additions, kept intentionally small — every schema change here has to
 be mirrored in both `src-tauri/src/lib.rs` migrations and
-`cli/src/db.rs::ensure_schema` per `CONTRIBUTING.md`, so minimizing surface
-area minimizes that duplicated upkeep.
+`cli/src/db.rs::ensure_schema` per `CONTRIBUTING.md`.
 
-### 3.1 New migration (version 4): sync tracking on `time_entries`
+### 4.1 New migration (version 4): sync tracking on `time_entries`
 
 ```sql
 ALTER TABLE time_entries ADD COLUMN proofhub_time_entry_id TEXT;
@@ -141,9 +271,9 @@ ALTER TABLE time_entries ADD COLUMN proofhub_synced_at TEXT;
 Both nullable, both `NULL` until a push succeeds. `proofhub_time_entry_id`
 is what ProofHub's API hands back on a successful `POST .../time` — storing
 it is what makes "already synced" a real fact instead of a guess, and is
-also what a future "undo"/`DELETE` would need. `proofhub_synced_at` drives
-the sync-status badge (§7) and lets an edit made *after* a push visibly
-fall out of sync (see §7.3).
+also what a future update/`DELETE` would need. `proofhub_synced_at` drives
+the sync-status badge (§8) and lets an edit made *after* a push visibly
+fall out of sync (§8.3).
 
 Mirror in `cli/src/db.rs::ensure_schema` with the same
 `pragma_table_info`-guarded `ALTER TABLE ... ADD COLUMN` pattern already
@@ -151,318 +281,205 @@ used there for `projects.alias` — the CLI never populates or reads these
 columns, this is purely to keep the schema shape consistent for a database
 the CLI might create first.
 
-### 3.2 No new tables — reuse the existing (currently unused) `settings` table
+### 4.2 No new tables — reuse the existing (currently unused) `settings` table
 
 `src-tauri/src/lib.rs` migration 1 already created a generic
 `settings(key TEXT PRIMARY KEY, value TEXT NOT NULL)` table that nothing in
-the codebase reads or writes today. That's exactly the shape needed for
-the ProofHub project/timesheet mapping — small, low-cardinality (bounded by
-the user's own project count), and not "tracked data" in the sense that
-tags or entries are. Proposed keys (all JSON-encoded values):
+the codebase reads or writes today. Proposed keys (all JSON-encoded except
+the plugin version, which is a plain string):
 
 | key | value shape |
 |---|---|
-| `proofhub.enabled` | `"true"` / `"false"` |
+| `proofhub.pluginInstalledVersion` | `"0.5.0"` (absent = not installed) |
+| `proofhub.enabled` | `"true"` / `"false"` (connected, not just installed) |
 | `proofhub.subdomain` | `"acmecorp"` |
 | `proofhub.projectMap` | `{"<chronosProjectId>": {"proofhubProjectId": "123", "timesheetId": "456", "timesheetTitle": "Chronos time", "defaultBillable": true, "todolistId": "789"}}` |
-
-Why not a dedicated `proofhub_project_map` table: it would need its own
-migration and its own CLI mirror for something that is genuinely
-app-configuration, not user time-tracking data — the `settings` table
-exists for precisely this and using it avoids schema growth for no benefit.
 
 **This table is deliberately excluded from backups.** Both
 `exportJsonBackup()` (`src/lib/exportImport.ts`) and `performAutoBackup()`
 (`src/lib/autoBackup.ts`) already do targeted `SELECT`s (`listProjects`,
 `listEntries`, `listTags`) rather than dumping the whole database — neither
-touches `settings`, so nothing here needs to change to keep the mapping out
-of backup files. This is a property to preserve, not just a coincidence:
-losing the mapping on restore is an acceptable, easily-redone inconvenience;
-leaking it would not be (see §4 for why the API key specifically must never
-land here at all).
+touches `settings`. Losing the mapping/install-state on restore is an
+acceptable, easily-redone inconvenience.
 
-### 3.3 A new `src/db/proofhubSettings.ts` module
+### 4.3 A new `src/db/proofhubSettings.ts` module
 
 Thin `get`/`set` wrapper around `SELECT/INSERT OR REPLACE INTO settings`,
-JSON-encoding/decoding the values above. No new Zustand store is strictly
-required — a `useProofHubStore` mirroring `useAutoBackupStore`'s shape
-(hydrate on load, one setter per field) is still the right call for
-consistency with how every other cross-cutting setting in the app works,
-just backed by this DB module instead of `localStorage` for the
-non-secret fields.
+JSON-encoding/decoding the values above, plus a `useProofHubStore`
+mirroring `useAutoBackupStore`'s shape for the non-secret fields.
 
-## 4. Credential storage — where the API key actually lives
+## 5. Credential storage — where the API key actually lives
 
-This is the one piece of this feature that isn't "make it work," it's
-"make it work without creating a new way to leak a credential." Two
-existing facts make the naive approach unsafe:
+Unchanged in spirit from the original design, refined for the
+process-boundary in §3: the credential is decrypted **only in the main
+app's Rust process**, in memory, immediately before a `proofhub_plugin_call`
+— it's merged into the JSON payload piped to the plugin binary's stdin for
+that one call and never written to disk by the plugin itself (§3.2). The
+plugin process never independently reads or caches it.
 
-- Every other Chronos setting lives in `localStorage`, which is trivially
-  readable by anything with local access and is not designed to hold
-  secrets.
-- The `settings` SQLite table (§3.2) is a reasonable home for the
-  *mapping*, but the app's DB file itself has no encryption at rest, and a
-  user could reasonably copy/back up their `chronos.db` file by hand
-  (outside Chronos's own export flow) without realizing it now contains a
-  live API credential.
-
-The API key must live somewhere that is (a) never touched by any export or
-backup code path, and (b) not plaintext-readable by a casual `cat`.
-
-### 4.1 Options considered
-
-**A — OS keychain (Rust `keyring` crate)**, wrapping macOS Keychain,
-Windows Credential Manager, and Secret Service/libsecret on Linux. This is
-the textbook-correct answer and what most desktop CLI tools do (`gh`,
-`git-credential-manager`, etc.). The problem is specifically *this
-project's own distribution channel*: Chronos ships via AUR to minimal
-window-manager Linux setups (Hyprland/Omarchy, the maintainer's own
-environment), where a Secret Service provider (`gnome-keyring`,
-`kwallet`, `keepassxc`) is often not running by default. `keyring` calls
-fail outright on a machine with no Secret Service daemon — the exact kind
-of native-dependency fragility this project already spent several releases
-fighting (`libayatana-appindicator`, bundled SQLite linking under
-`makepkg`). Adopting it as the *only* path risks reproducing that pattern.
-
-**B — `tauri-plugin-stronghold`**, the official encrypted-vault plugin.
-Cross-platform, no OS keychain daemon dependency, but its vault is unlocked
-with a password — meaning either the user types a master password (bad UX
-for a single API key) or Chronos derives one silently, which is most of the
-complexity of option C without option C's simplicity.
-
-**C — A local encrypted file**, outside the SQLite DB and outside
-`localStorage`, e.g. `proofhub-credentials.enc` in the same Tauri app-config
-directory the DB already lives in (`~/.config/com.richardson.chronos/` on
-Linux). Encrypted with a key that itself lives in a sibling file with
-restrictive permissions (`0600`, Unix; default ACL is fine on Windows since
-it's already scoped to the user profile). This defends against exactly the
-realistic threats here — accidental inclusion in a backup/export, a casual
-`cat` of a config directory, syncing `~/.config` into a cloud-synced dotfiles
-repo — without depending on a Secret Service daemon existing.
-
-### 4.2 Recommendation
-
-**Ship C for v1**, then offer A as an **optional upgrade in a later phase**,
-detected at runtime: if `keyring` can successfully read/write a test entry
-on this machine, offer a one-time "use your system keychain instead" switch
-in Settings; otherwise stay on the encrypted file with no error shown to
-the user (this should never be a hard failure — it's a nice-to-have, not a
-requirement). This mirrors the two-tier fallback pattern several other
-cross-platform CLI tools use for exactly this reason, and avoids adding a
-new native dependency (and a new AUR `depends=()` entry to babysit) before
-it's proven necessary.
-
-Implementation shape for C: a `#[tauri::command] proofhub_save_credentials`
-and `proofhub_load_credentials` pair in Rust, using a small symmetric cipher
-(`aes-gcm` crate is fine, already a transitive dependency family via other
-Tauri plugins) keyed by 32 random bytes generated once on first save and
-written to a sibling file with `0600` perms. This is deliberately *not*
-"perfect" security — a determined local attacker with filesystem access as
-the same user can already read anything Chronos itself can read, same as
-every other desktop app's local credential storage — it is specifically
-scoped to stop the credential from silently riding along in a JSON backup,
-a cloud-synced folder, or a support screenshot of `chronos.db`'s contents.
+At rest, the key lives in a local encrypted file (e.g.
+`proofhub-credentials.enc` beside `chronos.db` in the app's config
+directory), encrypted with a key generated on first save and stored in a
+sibling file with restrictive permissions (`0600` on Unix). This was
+chosen over the OS keychain (`keyring` crate) because this project ships
+to minimal Linux window-manager setups (the maintainer's own Omarchy/
+Hyprland environment included) where a Secret Service provider often isn't
+running — the same category of native-dependency fragility this project
+already spent several releases fighting. An OS-keychain option can be
+offered later as an opt-in upgrade once this ships and proves itself
+(§11, Phase 3).
 
 The API key **never** enters `src/db/proofhubSettings.ts`, the `settings`
-table, `localStorage`, or any Zustand store's persisted state — it's fetched
-into memory only when a push is about to happen, entirely on the Rust side,
-and the frontend never receives it back (write-only from the JS
-perspective: "save this key," never "give me the key").
+table, `localStorage`, or any Zustand store's persisted state, and it never
+touches the plugin binary's own filesystem access — it's write-only from
+the JS perspective ("save this key," never "give me the key").
 
-## 5. Settings UX — the "plugin" surface
+## 6. Settings UX — the "plugin" surface
 
-New collapsible section in Settings, placed after "Startup & shortcuts,"
-titled **"Integrations."** ProofHub is the only entry; the section itself
-is written generically enough that a second integration wouldn't need a
-restructure, but nothing generic is built ahead of that actually happening
-(no plugin-registry abstraction for a population of one).
+New collapsible section in Settings, after "Startup & shortcuts," titled
+**"Integrations."** The section header/description shown before install is
+intentionally generic (name, one-line description, an Install button) —
+this shell ships in the base app because *some* UI has to exist to offer
+the feature at all, but it contains no ProofHub API knowledge, just a
+label and a download trigger. Everything past this point is a lazy-loaded
+(`React.lazy`) component, so its code isn't on the JS execution path for a
+user who never installs.
 
-1. **Off state (default):** a single `Switch`, "Enable ProofHub
-   integration," off. Nothing else renders. The React component for
-   everything below this point is lazy-loaded (`React.lazy`) so its code
-   isn't even in the bundle path a non-user hits.
-2. **On, not yet connected:** two fields — "ProofHub subdomain" (with a
+1. **Not installed (default):** "ProofHub — send logged hours to ProofHub
+   projects and tasks. [Install]". Clicking Install calls
+   `proofhub_plugin_install` (§3.3), shows progress (download → verify →
+   done), and reveals step 2 on success. A failed signature check shows a
+   clear "the downloaded plugin failed verification and was not installed"
+   message — never a silent partial install.
+2. **Installed, not connected:** two fields — "ProofHub subdomain" (with a
    hint: "the part before `.proofhub.com` in your ProofHub URL") and "API
-   key" (password-masked `Input`, with a link to ProofHub's own "API
-   access" profile page for where to find it). A "Test & connect" button
-   calls `GET /projects` with the given credentials; success stores them
-   (§4) and reveals step 3, failure shows the raw HTTP status inline
-   ("401 — check your API key," "Couldn't reach `{subdomain}.proofhub.com`
-   — check the subdomain").
+   key" (password-masked, with a link to ProofHub's own "API access"
+   profile page). A "Test & connect" button calls `proofhub_plugin_call
+   ("test-connection", ...)`; success saves the credential (§5) and reveals
+   step 3.
 3. **Connected — project mapping table:** one row per non-archived Chronos
-   project, each with:
-   - A dropdown of ProofHub projects (from the `GET /projects` call already
-     made).
-   - A dropdown of that ProofHub project's timesheets (`GET
-     /projects/{id}/timesheets`, fetched on ProofHub-project selection), plus
-     a **"Create 'Chronos time' timesheet"** button that does the `POST` for
-     the common case of a user who hasn't set one up.
-   - An optional todolist+task pair, for users who want task-level
-     attribution — a nested "Link to a specific task" disclosure, since most
-     users will be fine logging at the project/timesheet level.
-   - A default billable toggle (billable/none), applied as the default on
-     every push from that project, overridable per push (§7).
-   Chronos projects with no mapping set are simply not pushable — their
-   entries show no sync affordance in the Records view at all, so a
-   half-configured integration doesn't clutter unrelated projects.
-4. **A "Disconnect" action** that deletes the stored credential (§4) and the
-   `proofhub.*` settings keys, and flips the enable switch off. This does
-   **not** touch `proofhub_time_entry_id`/`proofhub_synced_at` on already-
-   pushed entries — that history is harmless local metadata once
-   disconnected, consistent with not deleting user data as a side effect of
-   an unrelated action.
+   project: a ProofHub-project dropdown, a timesheet dropdown for that
+   project (plus a **"Create 'Chronos time' timesheet"** convenience
+   button), an optional "link to a specific task" disclosure
+   (todolist+task), and a default billable toggle. Unmapped Chronos
+   projects show no sync affordance anywhere in the app.
+4. **"Disconnect"** clears the credential and `proofhub.*` mapping/enabled
+   settings, dropping back to step 2's empty form. **"Uninstall"** (a
+   separate action, further down) removes the downloaded binary entirely
+   (§3.3), dropping back to step 1. Neither touches already-pushed entries'
+   sync metadata (§4.1).
 
-## 6. Chronos → ProofHub entity mapping
+## 7. Chronos → ProofHub entity mapping
 
 | Chronos concept | ProofHub concept | Notes |
 |---|---|---|
-| Project | Project + Timesheet | A Chronos project maps to one ProofHub project **and** one timesheet inside it (§2.2) — both are stored per mapping. |
-| Task number / description | Time entry `description` | Chronos already merges these into one field in the UI; sent verbatim as the entry's description, prefixed with nothing special (no forced "Chronos:" tag, keep it clean — the user can already see it came from Chronos via `list_id`/`task_id` if task-linked). |
-| Tags | *(not sent)* | ProofHub time entries have no tag concept; tags stay Chronos-only metadata. Revisit only if a real need shows up — no speculative mapping. |
-| Start/end time | *(not sent, only duration)* | ProofHub's time-entry model is duration-based (`logged_hours`/`logged_mins` + a `date`), not start/end timestamps — Chronos computes the duration from its own `duration_seconds` and floors/rounds to whole minutes. |
+| Project | Project + Timesheet | A Chronos project maps to one ProofHub project **and** one timesheet inside it (§2.2). |
+| Task number / description | Time entry `description` | Sent verbatim, no forced prefix. |
+| Tags | *(not sent)* | ProofHub time entries have no tag concept. |
+| Start/end time | *(not sent, only duration)* | ProofHub's time-entry model is duration-based (`logged_hours`/`logged_mins` + a `date`), not start/end timestamps. |
 | Duration | `logged_hours` + `logged_mins` | Converted from `duration_seconds`. |
 | Entry's calendar day | `date` | `YYYY-MM-DD`, from the entry's local start time. |
 | (mapping's default) | `status` (billable/none) | Per-project default, overridable per push. |
-| task_number match (optional) | `list_id` + `task_id` | Best-effort only if the project mapping has task-level linking configured (§5.3) — never required for a push to succeed. |
+| task_number match (optional) | `list_id` + `task_id` | Best-effort only if task-level linking is configured — never required for a push to succeed. |
 
-## 7. Push UX
+## 8. Push UX
 
-### 7.1 Per-entry manual push
+### 8.1 Per-entry manual push
 
 Every finished (non-running) entry whose project has a ProofHub mapping
 gets a small sync-status affordance in `EntryRow`/`GroupedEntryRow`, next to
-the existing tag chips:
+the existing tag chips: unsynced (send icon) → synced (filled checkmark,
+not re-clickable — re-push would create a duplicate ProofHub entry) → error
+(warning icon, click to retry, tooltip shows the reason).
 
-- **Unsynced:** a subtle "send" icon button, `title="Send to ProofHub"`.
-  Click → pushes just that entry, on success sets
-  `proofhub_time_entry_id`/`proofhub_synced_at` and swaps the icon to a
-  filled checkmark.
-- **Synced:** a filled checkmark, `title="Synced to ProofHub on {date}"`.
-  Not clickable by default (re-push would create a duplicate ProofHub time
-  entry — ProofHub has no natural dedupe key beyond the id it assigns).
-- **Error:** a small warning icon after a failed push, `title` showing the
-  reason (auth vs. network vs. validation), clickable to retry.
+### 8.2 Batch push (per day)
 
-### 7.2 Batch push (per day)
+A **"Send day to ProofHub"** button next to the existing copy-to-clipboard
+button in the day-group header, visible only if at least one unsynced,
+mapped entry exists that day. Shows a confirmation summary first, then
+fires requests sequentially with a small delay (§2.3's rate limit),
+continuing past individual failures. No "send week"/"send everything" bulk
+action in v1.
 
-The day-group header already has a copy-to-clipboard button
-(`RecordsView.tsx`); add a matching **"Send day to ProofHub"** button next
-to it, visible only if at least one unsynced, mapped entry exists that day.
-Clicking shows a confirmation summary first (「Send 3 entries, 4h 15m total,
-across 2 projects」) before firing requests sequentially with a small
-delay between them (§2.3's rate limit), showing a progress count and
-continuing past individual failures rather than aborting the whole batch —
-each entry's own row reflects its own final status per §7.1 either way.
+### 8.3 Edits after a push
 
-No "send week" / "send everything" bulk action in v1 — a day's worth is the
-natural unit given Chronos's own day-grouped UI, and a full-history
-backfill is a rare, one-time action better done by repeatedly using the
-per-day button than by building a separate bulk-sync screen for a not
-demonstrated need.
+Editing an already-synced entry clears `proofhub_synced_at` (keeps
+`proofhub_time_entry_id`) and the badge shows a distinct "out of sync"
+state; clicking it does a `PUT` (via `update-entry`) instead of a new
+`POST`. Deleting a synced Chronos entry does not delete it from ProofHub
+automatically.
 
-### 7.3 Edits after a push
+### 8.4 No auto-push on stop
 
-Editing an already-synced entry (via `EntryEditPopover`) does **not**
-auto-repush. It clears `proofhub_synced_at` (but keeps
-`proofhub_time_entry_id`) and the row's badge changes to a distinct
-"out of sync" state (e.g. checkmark with a small dot) — clicking it now
-does a `PUT` (update) against the stored `proofhub_time_entry_id` instead of
-a `POST`, since ProofHub already has a matching entry. Deleting a
-Chronos entry that was previously synced does **not** delete it from
-ProofHub automatically — Chronos has no reliable way to know that's
-actually wanted, and silently deleting data in a third-party system the
-user didn't directly act on inside that system is out of scope; at most,
-surface a one-time toast noting the entry existed on ProofHub too.
+Deliberately not building an automatic push-on-stop mode for v1 — the most
+surprising option for a tool whose identity is "manual, you're always in
+control." Revisit only if real usage shows people want it.
 
-### 7.4 No auto-push on stop
-
-Deliberately not building an "automatically send every entry to ProofHub
-the moment I stop the timer" mode for v1. It's the most surprising option
-for a tool whose entire identity is "manual, you're always in control," and
-it removes the moment where a user would naturally catch a
-wrong project/description before it leaves the device. Worth revisiting
-only if real usage of the manual/batch flow shows people want it — not
-worth speculatively building now.
-
-## 8. Error handling
+## 9. Error handling
 
 | Condition | Behavior |
 |---|---|
-| `401`/`403` (bad/reset key) | Mark integration "disconnected" in the UI (distinct from the user-initiated Disconnect in §5.4 — same state, different entry point), surface "Your ProofHub connection needs to be reconnected" with a direct path back to Settings. Stop attempting further pushes until reconnected. |
+| Plugin not installed when a call is attempted | Should be unreachable from the UI (step-gated per §6), but the bridge command checks and returns a distinct error rather than trying to spawn a missing file. |
+| Plugin binary fails to spawn / crashes / times out | Surfaced as "the ProofHub plugin didn't respond" with a suggestion to reinstall — distinct from a ProofHub-side error. |
+| `401`/`403` (bad/reset key) | Mark the connection "needs reconnecting" (distinct from user-initiated Disconnect, same resulting state), point back to Settings step 2. Stop attempting further pushes until reconnected. |
 | `429` (rate limit) | Honor `Retry-After`; in a batch push, pause and resume rather than failing the remaining entries. |
-| `4xx` validation (e.g. missing/invalid `timesheet_id` because it was deleted on the ProofHub side after mapping) | Surface the specific field/message ProofHub returns; point back to the project mapping in Settings to fix it. |
-| Network failure (offline, DNS, timeout) | Treat as retryable; leave the entry's status as unsynced (never invent a fake "synced" state on ambiguous failure — if the request's success is unknown, the entry is treated as still needing a push, since a false "unsynced" is a re-click, while a false "synced" is a silently missing hour in ProofHub). |
-| ProofHub returns a `201` but the local DB write fails right after (e.g. disk full) | Rare, but: the push already happened on ProofHub's side. Log this distinctly so a support conversation can tell "never sent" from "sent but not recorded locally" apart — don't silently swallow it as a generic failure, since retrying would double-log the hours. |
+| `4xx` validation (e.g. a mapped `timesheet_id` deleted on ProofHub's side) | Surface the specific message; point back to project mapping in Settings. |
+| Network failure (offline, DNS, timeout) | Treat as retryable; never mark an entry synced on ambiguous failure — a false "unsynced" costs a re-click, a false "synced" is a silently missing hour in ProofHub. |
+| ProofHub returns success but the local DB write fails right after | Log distinctly so "never sent" and "sent but not recorded locally" aren't confused — don't let a retry double-log the hours. |
 
-## 9. Architecture / file layout
+## 10. Architecture / file layout
 
-Kept in its own directory on both sides so the "opt-in plugin" framing is
-also true of the source tree, not just the UI — easy to audit, easy to
-rip out if it doesn't pan out:
+- **`proofhub-plugin/`** (new Cargo workspace member) — `src/main.rs`,
+  stdin/stdout JSON action dispatch (§3.2), `reqwest`/`serde` only.
+- **`src-tauri/src/proofhub_plugin.rs`** (new) — install/uninstall/status/
+  bridge commands (§3.3), signature verification (§3.4), the embedded
+  public key constant.
+- **`src-tauri/src/proofhub_credentials.rs`** (new) — encrypted
+  credential file read/write (§5).
+- **`src/integrations/proofhub/`** (new) — `ProofHubSettings.tsx` (§6,
+  lazy-loaded), `useProofHubStore.ts`, the shared sync-badge component used
+  by `EntryRow`/`GroupedEntryRow` (§8.1), the day-header "Send day" button
+  logic (§8.2).
+- **`src/db/proofhubSettings.ts`** (new) — alongside the other `db/`
+  modules (§4.3).
+- **No new webview capability entries** — all HTTP happens in Rust
+  (plugin process + the main app's download step), never via a JS-side
+  `@tauri-apps/plugin-http` call.
 
-- **Rust:** `src-tauri/src/proofhub.rs` — the HTTP client (using the
-  `reqwest` crate, a new dependency; nothing existing in this codebase
-  makes outbound HTTP calls from Rust today apart from the updater plugin's
-  own internal client, which isn't reusable here), the credential
-  encrypt/decrypt commands from §4.2, and the `#[tauri::command]` functions
-  the frontend calls (`proofhub_test_connection`, `proofhub_list_projects`,
-  `proofhub_list_timesheets`, `proofhub_create_timesheet`,
-  `proofhub_list_todolists`, `proofhub_list_tasks`, `proofhub_push_entry`,
-  `proofhub_save_credentials`, `proofhub_load_credentials`,
-  `proofhub_clear_credentials`). Registered in `lib.rs`'s
-  `invoke_handler!` alongside the existing tray/shortcut commands.
-- **React:** `src/integrations/proofhub/` — `ProofHubSettings.tsx` (§5,
-  lazy-loaded), `useProofHubStore.ts` (non-secret settings, §3.3),
-  `syncBadge.tsx` shared by `EntryRow`/`GroupedEntryRow` (§7.1), and the
-  day-header "Send day" button's logic (§7.2). `src/db/proofhubSettings.ts`
-  stays under `db/` alongside the other DB modules for consistency with
-  `db/tags.ts`, `db/projects.ts`, etc.
-- **New capability entries** in `src-tauri/capabilities/default.json`: none
-  expected — the HTTP calls happen entirely in Rust command handlers, not
-  via a JS-side `@tauri-apps/plugin-http` capability, so there's no new
-  webview-facing permission surface to grant.
+## 11. i18n
 
-## 10. i18n
-
-Every new string (Settings section, field labels/hints, sync-status
-tooltips, error messages, confirmation dialogs) needs both
+Every new string (Settings section, install progress/errors, field
+labels/hints, sync-status tooltips, confirmation dialogs) needs both
 `src/i18n/locales/en.json` and `pt-BR.json` entries under a new
-`proofhub.*` namespace, per `CONTRIBUTING.md`. Not enumerated key-by-key
-here since the exact copy will settle during implementation — noted so it
-isn't missed at review time.
+`proofhub.*` namespace, per `CONTRIBUTING.md`.
 
-## 11. Phased implementation plan
+## 12. Phased implementation plan
 
 **Phase 1 — connect + manual push (the MVP that delivers the user's actual
-ask):**
-- Migration v4 (§3.1) + CLI mirror.
-- Credential storage (§4, option C only).
-- Settings UI through step 3 of §5 (enable → connect → per-project mapping,
-  including "create timesheet" convenience).
-- Per-entry manual push + sync badge (§7.1) + error handling (§8).
-- This alone satisfies "consigo lançar as horas do Chronos nas tasks e
-  projetos do ProofHub" — everything after this is refinement, not the core
-  ask.
+ask), targeting v0.5.0:**
+- `proofhub-plugin` crate (§3.2) + CI build/sign/publish (§3.4).
+- Install/uninstall/status/bridge commands (§3.3) + encrypted credential
+  storage (§5).
+- Migration v4 (§4.1) + CLI mirror.
+- Settings UI through step 3 of §6 (install → connect → per-project
+  mapping, including "create timesheet" convenience).
+- Per-entry manual push + sync badge (§8.1) + error handling (§9).
 
 **Phase 2 — batch push + task-level linking:**
-- "Send day to ProofHub" (§7.2).
-- Optional todolist+task mapping and `list_id`/`task_id` on push (§5.3,
-  §6).
-- Re-sync flow for edited entries (§7.3).
+- "Send day to ProofHub" (§8.2).
+- Optional todolist+task mapping and `list_id`/`task_id` on push.
+- Re-sync flow for edited entries (§8.3).
 
 **Phase 3 — optional hardening, only if warranted by real use:**
-- OS-keychain upgrade path (§4.2's option A) as an opt-in switch once a
-  file-based credential has shipped and proven itself.
-- Revisit auto-push-on-stop (§7.4) only if requested.
+- OS-keychain upgrade path for the credential (§5), opt-in.
+- Revisit auto-push-on-stop (§8.4) only if requested.
 
-## 12. Open questions (need the user's call before/during Phase 1)
+## 13. Open questions / confirmations needed during Phase 1
 
-1. Confirm the exact `User-Agent` string to send (needs a real contact
-   email/identifier — currently placeholder in §2.1).
-2. Whole ProofHub accounts can have multiple companies; does the user's own
-   account ever need to switch between more than one `{companyurl}`
-   subdomain, or is one enough for v1's single-subdomain Settings field?
+1. **Generating and storing the plugin-signing keypair as new repo
+   secrets is a one-time, security-relevant action** — done as an explicit
+   confirmed step when implementation reaches §3.4, not silently.
+2. Confirm the exact `User-Agent` string to send (§2.1).
 3. Rounding rule for `logged_hours`/`logged_mins` when `duration_seconds`
    isn't a whole number of minutes (round to nearest minute vs. always
-   round up) — cosmetic but should be a deliberate choice, not whatever
-   integer division happens to do.
+   round up).
