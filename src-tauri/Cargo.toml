@@ -1,6 +1,6 @@
 [package]
 name = "chronos"
-version = "0.3.4"
+version = "0.3.5"
 description = "A manual, local-first time tracker built with Tauri and React."
 authors = ["Richardson Calegari Saconi"]
 license = "MIT"
@@ -24,7 +24,7 @@ tauri-build = { version = "2", features = [] }
 # this duplicate here too, sqlx-macros' own copy of libsqlite3-sys still
 # links the system SQLite and can fail with the same `sqlite3_unlock_notify`
 # error even though the final binary's copy is bundled.
-libsqlite3-sys = { version = "0.28", features = ["bundled"] }
+libsqlite3-sys = { version = "0.28", features = ["bundled", "unlock_notify"] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
@@ -42,5 +42,9 @@ tauri-plugin-process = "2.3.1"
 # which is fragile across distros (e.g. a clean build failed on Arch with an
 # undefined `sqlite3_unlock_notify` symbol). Force the vendored/bundled
 # SQLite instead, same as chronos-cli already does, for a build that doesn't
-# depend on the host's SQLite version or how it was compiled.
-libsqlite3-sys = { version = "0.28", features = ["bundled"] }
+# depend on the host's SQLite version or how it was compiled. `unlock_notify`
+# is required too: sqlx-sqlite calls sqlite3_unlock_notify() unconditionally,
+# but that function only exists in SQLite's amalgamation when compiled with
+# SQLITE_ENABLE_UNLOCK_NOTIFY — which libsqlite3-sys's "bundled" feature does
+# NOT set by default (unlike most distro-packaged libsqlite3.so, which do).
+libsqlite3-sys = { version = "0.28", features = ["bundled", "unlock_notify"] }
