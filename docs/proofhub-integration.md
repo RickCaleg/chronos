@@ -247,13 +247,21 @@ keypair to GitHub's repo secrets is a one-time, security-relevant action —
 done as an explicit, confirmed step, not silently, same as any other change
 to shared secrets.**
 
-CI (`release.yml`) gets a new step alongside the existing `chronos-cli`
-build: build `proofhub-plugin` in release mode for each platform in the
-matrix, sign each binary with the new key (`minisign-cli`, installed via
-`cargo install minisign-cli` so the step is identical across the
-`ubuntu-latest`/`windows-latest` runners rather than depending on an OS
-package manager), and upload both the binary and its `.minisig` as extra
-release assets — mirroring the existing `chronos-cli` staging step exactly.
+**Status: done.** The keypair was generated with `npx tauri signer generate`
+and its private half + password registered as the `PLUGIN_SIGNING_PRIVATE_KEY`
+/ `PLUGIN_SIGNING_PRIVATE_KEY_PASSWORD` repo secrets; the public half is the
+`PLUGIN_PUBLIC_KEY_B64` constant in `src-tauri/src/proofhub_plugin.rs`. No
+copy of the private key was kept outside GitHub's secret store.
+
+`release.yml` builds `chronos-proofhub-plugin` in release mode for each
+platform in the matrix (mirroring the existing `chronos-cli` staging step)
+and signs each binary before upload. Neither the `rsign` nor `minisign` CLI
+tools accept the decryption password non-interactively (TTY prompt only,
+which a CI runner doesn't have) — `xtask/src/sign_plugin.rs` is a small
+internal helper (not shipped) that calls the `minisign` crate's library API
+directly instead, reading the key/password from the same two secrets.
+Verified end-to-end locally: signed with this exact xtask, verified with
+the exact `minisign-verify` call `proofhub_plugin_install` uses.
 
 ## 4. Data model changes
 
@@ -476,10 +484,14 @@ ask), targeting v0.5.0:**
 
 ## 13. Open questions / confirmations needed during Phase 1
 
-1. **Generating and storing the plugin-signing keypair as new repo
-   secrets is a one-time, security-relevant action** — done as an explicit
-   confirmed step when implementation reaches §3.4, not silently.
-2. Confirm the exact `User-Agent` string to send (§2.1).
-3. Rounding rule for `logged_hours`/`logged_mins` when `duration_seconds`
-   isn't a whole number of minutes (round to nearest minute vs. always
-   round up).
+1. ~~Generating and storing the plugin-signing keypair as new repo
+   secrets~~ — done; see §3.4.
+2. Confirm the exact `User-Agent` string to send (§2.1). Currently
+   `Chronos (richardson.saconi@outlook.com)` in the plugin binary and
+   `Chronos/{version}` for the install download itself.
+3. Rounding rule for `logged_hours`/`logged_mins`: implemented as "round
+   to the nearest whole minute" (`sync.ts`'s `pushEntryToProofHub`).
+4. **Not yet done: an actual tagged release containing the signed plugin
+   binaries.** `proofhub_plugin_install` fetches from the running app's
+   own version tag, so the install button has nothing to download until a
+   v0.5.0 (or later) release is cut with this workflow.

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["src-tauri", "cli", "proofhub-plugin"]
+members = ["src-tauri", "cli", "proofhub-plugin", "xtask"]
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

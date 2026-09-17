@@ -72,6 +72,29 @@ jobs:
             cp target/release/chronos-cli dist-cli/chronos-cli-linux-x86_64
           fi
 
+      - name: Build chronos-proofhub-plugin (release)
+        run: cargo build --release -p chronos-proofhub-plugin
+
+      - name: Stage and sign the ProofHub plugin binary
+        shell: bash
+        env:
+          PLUGIN_SIGNING_PRIVATE_KEY: ${{ secrets.PLUGIN_SIGNING_PRIVATE_KEY }}
+          PLUGIN_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.PLUGIN_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          mkdir -p dist-plugin
+          if [ "${{ matrix.platform }}" = "windows-latest" ]; then
+            asset=dist-plugin/chronos-proofhub-plugin-windows-x86_64.exe
+            cp target/release/chronos-proofhub-plugin.exe "$asset"
+          else
+            asset=dist-plugin/chronos-proofhub-plugin-linux-x86_64
+            cp target/release/chronos-proofhub-plugin "$asset"
+          fi
+          # rsign/minisign only take the decryption password via an
+          # interactive TTY prompt, which this runner doesn't have — see
+          # xtask/src/sign_plugin.rs for why this uses the minisign crate
+          # directly instead of a CLI.
+          cargo run --release -p xtask --bin sign-plugin -- "$asset" "$asset.minisig"
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -84,8 +107,8 @@ jobs:
           releaseDraft: true
           prerelease: false
 
-      - name: Attach chronos-cli binary to the release
+      - name: Attach chronos-cli and proofhub-plugin binaries to the release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
-        run: gh release upload "${{ github.ref_name }}" dist-cli/* --clobber --repo "${{ github.repository }}"
+        run: gh release upload "${{ github.ref_name }}" dist-cli/* dist-plugin/* --clobber --repo "${{ github.repository }}"

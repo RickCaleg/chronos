@@ -18,12 +18,11 @@ const REPO: &str = "RickCaleg/chronos";
 
 /// Dedicated signing key for the downloaded plugin binaries, separate from
 /// the app's own auto-updater key so a compromise of one can't be used
-/// against the other. PLACEHOLDER: generating the real keypair and
-/// registering its secret half in CI is a deliberate, confirmed step (see
-/// docs/proofhub-integration.md section 13, item 1) — until that happens,
-/// every install attempt fails signature verification by design rather
-/// than silently accepting an unsigned binary.
-const PLUGIN_PUBLIC_KEY_B64: &str = "REPLACE_ME_ONCE_THE_PLUGIN_SIGNING_KEYPAIR_IS_GENERATED";
+/// against the other (see docs/proofhub-integration.md section 3.4). The
+/// private half lives only as the `PLUGIN_SIGNING_PRIVATE_KEY` /
+/// `PLUGIN_SIGNING_PRIVATE_KEY_PASSWORD` repo secrets, used by
+/// `.github/workflows/release.yml` to sign each platform's binary.
+const PLUGIN_PUBLIC_KEY_B64: &str = "RWTjlfY8vh0Wjf5faArmeN1r8WZMiw5Vk2WZ0w1eSLywT8RybxLZ1m72";
 
 fn asset_name() -> Result<&'static str, String> {
     if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
