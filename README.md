@@ -99,7 +99,7 @@ All of this is also available from the terminal — see [`docs/CLI.md`](docs/CLI
 
 ## Contributing
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up the project and what to keep in mind before opening a PR.
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up the project and what to keep in mind before opening a PR. Planned/candidate features live in [TODO.md](TODO.md).
 
 ## License
 
