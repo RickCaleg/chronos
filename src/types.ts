@@ -7,6 +7,12 @@ export interface Project {
   createdAt: string;
 }
 
+export interface Tag {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
 export interface TimeEntry {
   id: string;
   description: string;
@@ -18,6 +24,7 @@ export interface TimeEntry {
   isRunning: boolean;
   createdAt: string;
   updatedAt: string;
+  tags: Tag[];
 }
 
 export interface Backup {
@@ -25,4 +32,5 @@ export interface Backup {
   exportedAt: string;
   projects: Project[];
   timeEntries: TimeEntry[];
+  tags?: Tag[];
 }

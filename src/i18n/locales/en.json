@@ -5,6 +5,19 @@
     "projects": "Projects",
     "settings": "Settings"
   },
+  "palette": {
+    "placeholder": "Type a command...",
+    "empty": "No matching commands",
+    "startTimer": "Start timer",
+    "stopTimer": "Stop timer",
+    "goTimer": "Go to Timer",
+    "goProjects": "Go to Projects",
+    "newProject": "New project",
+    "goSettings": "Go to Settings",
+    "exportBackup": "Export full backup (JSON)",
+    "importBackup": "Import backup (JSON)",
+    "checkUpdates": "Check for updates"
+  },
   "timer": {
     "combinedPlaceholder": "What are you working on? Type # for a task number",
     "selectProject": "Select project",
@@ -29,6 +42,8 @@
   "editor": {
     "taskDescription": "Task & description",
     "project": "Project",
+    "tags": "Tags",
+    "tagsPlaceholder": "Add a tag...",
     "start": "Start",
     "end": "End",
     "duration": "Duration",
@@ -65,6 +80,14 @@
     "themeLight": "Light",
     "themeDark": "Dark",
     "themeOmarchy": "Omarchy",
+    "startupTitle": "Startup & shortcuts",
+    "startWithSystem": "Start with system",
+    "startWithSystemDescription": "Launch Chronos automatically on login, minimized to the tray.",
+    "globalShortcut": "Global shortcut",
+    "globalShortcutDescription": "Start/stop the timer from anywhere, even when Chronos isn't focused. Works alongside the tray icon's menu.",
+    "applyShortcut": "Apply",
+    "shortcutSaved": "Shortcut updated",
+    "shortcutInvalid": "Couldn't register that shortcut — it may already be in use by another app.",
     "display": "Display",
     "groupSimilar": "Group similar entries",
     "groupSimilarDescription": "Combine entries with the same task and description on the same day into one row.",

@@ -5,6 +5,19 @@
     "projects": "Projetos",
     "settings": "Configurações"
   },
+  "palette": {
+    "placeholder": "Digite um comando...",
+    "empty": "Nenhum comando encontrado",
+    "startTimer": "Iniciar timer",
+    "stopTimer": "Parar timer",
+    "goTimer": "Ir para Timer",
+    "goProjects": "Ir para Projetos",
+    "newProject": "Novo projeto",
+    "goSettings": "Ir para Configurações",
+    "exportBackup": "Exportar backup completo (JSON)",
+    "importBackup": "Importar backup (JSON)",
+    "checkUpdates": "Verificar atualizações"
+  },
   "timer": {
     "combinedPlaceholder": "No que você está trabalhando? Digite # para número da task",
     "selectProject": "Selecionar projeto",
@@ -29,6 +42,8 @@
   "editor": {
     "taskDescription": "Task e descrição",
     "project": "Projeto",
+    "tags": "Tags",
+    "tagsPlaceholder": "Adicionar tag...",
     "start": "Início",
     "end": "Fim",
     "duration": "Duração",
@@ -65,6 +80,14 @@
     "themeLight": "Claro",
     "themeDark": "Escuro",
     "themeOmarchy": "Omarchy",
+    "startupTitle": "Inicialização e atalhos",
+    "startWithSystem": "Iniciar com o sistema",
+    "startWithSystemDescription": "Abre o Chronos automaticamente no login, minimizado na bandeja.",
+    "globalShortcut": "Atalho global",
+    "globalShortcutDescription": "Inicia/para o timer de qualquer lugar, mesmo sem o Chronos em foco. Funciona junto com o menu do ícone da bandeja.",
+    "applyShortcut": "Aplicar",
+    "shortcutSaved": "Atalho atualizado",
+    "shortcutInvalid": "Não foi possível registrar esse atalho — talvez já esteja em uso por outro programa.",
     "display": "Exibição",
     "groupSimilar": "Agrupar registros similares",
     "groupSimilarDescription": "Combina em uma única linha os registros com a mesma task e descrição no mesmo dia.",

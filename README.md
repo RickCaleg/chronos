@@ -17,8 +17,13 @@ A manual time tracker for people who just want to press play, work, and press st
 - **One field for task + description** — type `#1234 fix login bug` and it's split live into task number and description as you type. Paste the fuller `#1234 - MRK - Fix login bug` (e.g. from an old Clockify description) and it also picks out the project by code. The same rule applies when importing CSVs, and autocomplete on this field recalls the project a task was last used with too.
 - **Group similar entries** — entries with the same task, description, and project on the same day collapse into one row with a total, expandable to see each session.
 - **Import / export** — full JSON backup, CSV export/import, and a dedicated Clockify CSV importer (matches Clockify's pt-BR export columns and applies the same paste-autofill rule to fill in task/project when they're embedded in the description).
+- **Tags** — a second, cross-cutting label on top of projects (e.g. `bug`, `meeting`, `client-x`), editable in the entry editor with autocomplete and create-on-the-fly.
 - **A real CLI** ([`chronos-cli`](docs/CLI.md)) — start/stop/list/edit entries, manage projects, export/import, and automate backups from a script, cron job, or a window-manager status bar widget. Reads and writes the same database as the GUI.
-- **Fully keyboard-driven** — `Ctrl+Enter` starts/stops the timer, `Alt+1/2/3` switches tabs, `Enter` saves in editors, `Esc` closes popovers, arrow keys navigate autocomplete.
+- **System tray + global shortcut** — closing the window minimizes to the tray instead of quitting; a configurable global keyboard shortcut (default `Ctrl+Alt+Space`) starts/stops the timer from anywhere, even with Chronos unfocused.
+- **Start with your system** — an optional Settings toggle launches Chronos on login, minimized to the tray.
+- **Command palette** — `Ctrl+K` opens a searchable list of actions (start/stop the timer, switch views, export/import a backup, check for updates).
+- **Automatic backups** — an optional, fully configurable schedule (hourly to weekly) that writes a JSON backup to a folder of your choice, with configurable retention.
+- **Fully keyboard-driven** — `Ctrl+Enter` starts/stops the timer, `Ctrl+K` opens the command palette, `Alt+1/2/3` switches tabs, `Enter` saves in editors, `Esc` closes popovers, arrow keys navigate autocomplete.
 - **Bilingual** — English and Portuguese (pt-BR), switchable in Settings.
 - **Theme-aware** — light, dark, follows the OS, or (on Linux) follows your [Omarchy](https://omarchy.org) theme live.
 - **Native by platform** — native title bar on Windows, native GTK decorations on Linux desktop environments, no title bar at all under a standalone window manager (Hyprland, sway, i3, ...).

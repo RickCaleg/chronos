@@ -1,6 +1,7 @@
 import { getDb } from "./client";
 import type { TimeEntry } from "../types";
 import { nowIso } from "../lib/time";
+import * as tagsDb from "./tags";
 
 interface EntryRow {
   id: string;
@@ -27,13 +28,17 @@ function fromRow(row: EntryRow): TimeEntry {
     isRunning: row.is_running === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    tags: [],
   };
 }
 
 export async function listEntries(): Promise<TimeEntry[]> {
   const db = await getDb();
-  const rows = await db.select<EntryRow[]>("SELECT * FROM time_entries ORDER BY start_time DESC");
-  return rows.map(fromRow);
+  const [rows, entryTags] = await Promise.all([
+    db.select<EntryRow[]>("SELECT * FROM time_entries ORDER BY start_time DESC"),
+    tagsDb.listEntryTags(),
+  ]);
+  return rows.map((row) => ({ ...fromRow(row), tags: entryTags.get(row.id) ?? [] }));
 }
 
 export async function getRunningEntry(): Promise<TimeEntry | null> {
@@ -63,6 +68,7 @@ export async function startEntry(input: StartEntryInput): Promise<TimeEntry> {
     isRunning: true,
     createdAt: now,
     updatedAt: now,
+    tags: [],
   };
   await db.execute(
     `INSERT INTO time_entries
@@ -123,6 +129,10 @@ export async function updateEntry(id: string, patch: EntryPatch): Promise<void> 
 
 export async function deleteEntry(id: string): Promise<void> {
   const db = await getDb();
+  // Not relying on the entry_tags foreign keys to cascade (SQLite has them
+  // off by default per-connection unless explicitly enabled), so clean up
+  // the join rows ourselves.
+  await db.execute("DELETE FROM entry_tags WHERE entry_id = $1", [id]);
   await db.execute("DELETE FROM time_entries WHERE id = $1", [id]);
 }
 

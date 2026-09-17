@@ -10,13 +10,13 @@
 # clone sidesteps that entirely — makepkg verifies it via git itself, so
 # sha256sums is intentionally SKIP here (standard for VCS sources).
 pkgname=chronos
-pkgver=0.3.7
+pkgver=0.4.0
 pkgrel=1
 pkgdesc="A manual, local-first time tracker with a CLI companion, built with Tauri and React"
 arch=('x86_64')
 url="https://github.com/RickCaleg/chronos"
 license=('MIT')
-depends=('webkit2gtk-4.1' 'gtk3' 'hicolor-icon-theme' 'desktop-file-utils')
+depends=('webkit2gtk-4.1' 'gtk3' 'hicolor-icon-theme' 'desktop-file-utils' 'libayatana-appindicator')
 makedepends=('rust' 'nodejs' 'npm' 'git')
 source=("$pkgname::git+https://github.com/RickCaleg/chronos.git#tag=v$pkgver")
 sha256sums=('SKIP')

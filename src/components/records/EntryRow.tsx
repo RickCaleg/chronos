@@ -73,6 +73,19 @@ export function EntryRow({ entry }: { entry: TimeEntry }) {
         </span>
 
         <span className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
+          {entry.tags.length > 0 && (
+            <span className="flex flex-wrap items-center gap-1">
+              {entry.tags.map((tag) => (
+                <span
+                  key={tag.id}
+                  className="rounded-[2px] bg-[var(--color-bg)] px-1.5 py-0.5 text-[10px] text-[var(--color-text-muted)]"
+                >
+                  {tag.name}
+                </span>
+              ))}
+            </span>
+          )}
+
           <span className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
             {project ? (
               <>

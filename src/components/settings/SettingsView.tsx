@@ -3,10 +3,12 @@ import { useTranslation } from "react-i18next";
 import { Download, FileSpreadsheet, FolderOpen, RefreshCw, Save, Trash2, Upload } from "lucide-react";
 import { confirm, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
+import { disable as disableAutostart, enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import { useThemeStore, type ThemePreference } from "../../store/useThemeStore";
 import { useProjectsStore } from "../../store/useProjectsStore";
 import { useEntriesStore } from "../../store/useEntriesStore";
-import { useAppSettingsStore } from "../../store/useAppSettingsStore";
+import { useAppSettingsStore, DEFAULT_GLOBAL_SHORTCUT } from "../../store/useAppSettingsStore";
 import { useAutoBackupStore } from "../../store/useAutoBackupStore";
 import { useUpdaterStore } from "../../store/useUpdaterStore";
 import { Button } from "../ui/Button";
@@ -48,7 +50,7 @@ const BASE_THEME_OPTIONS: { value: ThemePreference; labelKey: string }[] = [
 export function SettingsView() {
   const { t, i18n } = useTranslation();
   const { theme, setTheme, omarchyAvailable } = useThemeStore();
-  const { groupSimilarEntries, setGroupSimilarEntries } = useAppSettingsStore();
+  const { groupSimilarEntries, setGroupSimilarEntries, globalShortcut, setGlobalShortcut } = useAppSettingsStore();
   const autoBackup = useAutoBackupStore();
   const updater = useUpdaterStore();
   const [appVersion, setAppVersion] = useState<string | null>(null);
@@ -56,10 +58,35 @@ export function SettingsView() {
   const [backupStatus, setBackupStatus] = useState<string | null>(null);
   const [backingUp, setBackingUp] = useState(false);
   const [retentionInput, setRetentionInput] = useState(String(autoBackup.retentionCount));
+  const [autostartOn, setAutostartOn] = useState(false);
+  const [shortcutInput, setShortcutInput] = useState(globalShortcut);
+  const [shortcutStatus, setShortcutStatus] = useState<string | null>(null);
 
   useEffect(() => {
     getVersion().then(setAppVersion);
+    isAutostartEnabled().then(setAutostartOn).catch(() => {});
   }, []);
+
+  async function handleToggleAutostart(value: boolean) {
+    try {
+      if (value) await enableAutostart();
+      else await disableAutostart();
+      setAutostartOn(value);
+    } catch (err) {
+      setStatus(t("settings.operationFailed", { error: String(err) }));
+    }
+  }
+
+  async function handleApplyShortcut() {
+    const accelerator = shortcutInput.trim();
+    try {
+      await invoke("register_global_shortcut", { accelerator });
+      setGlobalShortcut(accelerator);
+      setShortcutStatus(t("settings.shortcutSaved"));
+    } catch {
+      setShortcutStatus(t("settings.shortcutInvalid"));
+    }
+  }
 
   useEffect(() => {
     setRetentionInput(String(autoBackup.retentionCount));
@@ -165,6 +192,36 @@ export function SettingsView() {
               {t(opt.labelKey)}
             </button>
           ))}
+        </div>
+      </section>
+
+      <section className="mb-6 rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <h2 className="mb-3 text-sm font-medium">{t("settings.startupTitle")}</h2>
+
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm">{t("settings.startWithSystem")}</p>
+            <p className="text-xs text-[var(--color-text-muted)]">{t("settings.startWithSystemDescription")}</p>
+          </div>
+          <Switch checked={autostartOn} onChange={handleToggleAutostart} label={t("settings.startWithSystem")} />
+        </div>
+
+        <div>
+          <p className="mb-0.5 text-xs font-medium text-[var(--color-text-muted)]">{t("settings.globalShortcut")}</p>
+          <p className="mb-1.5 text-xs text-[var(--color-text-muted)]">{t("settings.globalShortcutDescription")}</p>
+          <div className="flex items-center gap-2">
+            <Input
+              value={shortcutInput}
+              onChange={(e) => setShortcutInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleApplyShortcut()}
+              placeholder={DEFAULT_GLOBAL_SHORTCUT}
+              className="max-w-[220px] font-mono"
+            />
+            <Button variant="secondary" size="sm" onClick={handleApplyShortcut} disabled={shortcutInput.trim() === ""}>
+              {t("settings.applyShortcut")}
+            </Button>
+          </div>
+          {shortcutStatus && <p className="mt-2 text-sm">{shortcutStatus}</p>}
         </div>
       </section>
 

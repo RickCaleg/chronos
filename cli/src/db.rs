@@ -61,6 +61,20 @@ fn ensure_schema(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_time_entries_start_time ON time_entries(start_time);
         CREATE INDEX IF NOT EXISTS idx_time_entries_project_id ON time_entries(project_id);
+
+        CREATE TABLE IF NOT EXISTS tags (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS entry_tags (
+            entry_id TEXT NOT NULL REFERENCES time_entries(id) ON DELETE CASCADE,
+            tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+            PRIMARY KEY (entry_id, tag_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_entry_tags_tag_id ON entry_tags(tag_id);
         "#,
     )?;
 

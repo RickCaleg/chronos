@@ -4,8 +4,14 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.4.0] - 2026-09-17
 ### Added
-- Optional automatic backups to a folder of your choice, in Settings (off by default), with a configurable retention count (presets or a custom number; use 1 to always overwrite with just the latest).
+- Optional automatic backups to a folder of your choice, with a configurable schedule and retention count.
+- System tray icon, with a configurable global shortcut to start/stop the timer from anywhere. Closing the window now minimizes to the tray instead of quitting.
+- Optional "start with system" (minimized to tray).
+- Command palette (`Ctrl+K`) for quick access to common actions.
+- Tags — a second, freeform label on entries alongside projects, with autocomplete.
 ### Fixed
 - "Today" sorting last in the records list when it had no finished entries yet (only a running timer).
 

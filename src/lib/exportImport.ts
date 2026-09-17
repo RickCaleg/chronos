@@ -3,14 +3,19 @@ import { writeTextFile, readTextFile } from "@tauri-apps/plugin-fs";
 import type { Backup, Project, TimeEntry } from "../types";
 import * as projectsDb from "../db/projects";
 import * as entriesDb from "../db/entries";
+import * as tagsDb from "../db/tags";
 import { parseCsv, toCsvRow } from "./csv";
 import { combineLocalDateTime, durationBetween, formatLocalDate, formatLocalTimeLong, nowIso } from "./time";
 import { pickColor } from "../store/useProjectsStore";
 import { resolveImportedEntryFields } from "./pasteParser";
 
 export async function exportJsonBackup(): Promise<boolean> {
-  const [projects, timeEntries] = await Promise.all([projectsDb.listProjects(), entriesDb.listEntries()]);
-  const backup: Backup = { version: 1, exportedAt: nowIso(), projects, timeEntries };
+  const [projects, timeEntries, tags] = await Promise.all([
+    projectsDb.listProjects(),
+    entriesDb.listEntries(),
+    tagsDb.listTags(),
+  ]);
+  const backup: Backup = { version: 1, exportedAt: nowIso(), projects, timeEntries, tags };
 
   const path = await save({
     defaultPath: `chronos-backup-${formatLocalDate(nowIso())}.json`,
@@ -23,6 +28,8 @@ export async function exportJsonBackup(): Promise<boolean> {
 }
 
 export async function resetAllData(): Promise<void> {
+  await tagsDb.replaceAllEntryTags([]);
+  await tagsDb.replaceAllTags([]);
   await entriesDb.replaceAllEntries([]);
   await projectsDb.replaceAllProjects([]);
 }
@@ -43,6 +50,8 @@ export async function importJsonBackup(): Promise<boolean> {
 
   await projectsDb.replaceAllProjects(backup.projects);
   await entriesDb.replaceAllEntries(backup.timeEntries);
+  await tagsDb.replaceAllTags(backup.tags ?? []);
+  await tagsDb.replaceAllEntryTags(backup.timeEntries.map((e) => ({ id: e.id, tags: e.tags ?? [] })));
   return true;
 }
 
@@ -158,6 +167,7 @@ export async function importEntriesCsv(): Promise<{ imported: number }> {
       isRunning: false,
       createdAt: now,
       updatedAt: now,
+      tags: [],
     });
     imported++;
   }
@@ -258,6 +268,7 @@ export async function importClockifyCsv(): Promise<{ imported: number }> {
       isRunning: false,
       createdAt: now,
       updatedAt: now,
+      tags: [],
     });
     imported++;
   }

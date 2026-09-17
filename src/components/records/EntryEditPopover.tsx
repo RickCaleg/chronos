@@ -3,9 +3,12 @@ import { useTranslation } from "react-i18next";
 import { FloatingPanel } from "../ui/FloatingPanel";
 import { Input } from "../ui/Input";
 import { AutocompleteInput } from "../ui/AutocompleteInput";
+import { TagInput } from "../ui/TagInput";
 import { Button } from "../ui/Button";
 import { ProjectPicker } from "../timer/ProjectPicker";
 import type { TimeEntry } from "../../types";
+import { useEntriesStore } from "../../store/useEntriesStore";
+import { useTagsStore } from "../../store/useTagsStore";
 import {
   addSeconds,
   durationBetween,
@@ -46,6 +49,8 @@ export function EntryEditPopover({ open, onClose, entry, onSave, onDelete }: Ent
   const suggestions = useSuggestions();
   const suggestionByDisplay = useMemo(() => new Map(suggestions.map((s) => [s.display, s])), [suggestions]);
   const { projects } = useProjectsStore();
+  const { tags: allTags, findOrCreate: findOrCreateTag } = useTagsStore();
+  const setEntryTags = useEntriesStore((s) => s.setEntryTags);
 
   if (!open) return null;
 
@@ -165,6 +170,17 @@ export function EntryEditPopover({ open, onClose, entry, onSave, onDelete }: Ent
             {t("editor.project")}
           </label>
           <ProjectPicker value={projectId} onChange={setProjectId} />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-[var(--color-text-muted)]">{t("editor.tags")}</label>
+          <TagInput
+            value={entry.tags}
+            onChange={(tags) => setEntryTags(entry.id, tags)}
+            suggestions={allTags}
+            onCreate={findOrCreateTag}
+            placeholder={t("editor.tagsPlaceholder")}
+          />
         </div>
 
         <div>

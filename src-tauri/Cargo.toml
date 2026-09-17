@@ -1,6 +1,6 @@
 [package]
 name = "chronos"
-version = "0.3.7"
+version = "0.4.0"
 description = "A manual, local-first time tracker built with Tauri and React."
 authors = ["Richardson Calegari Saconi"]
 license = "MIT"
@@ -27,7 +27,7 @@ tauri-build = { version = "2", features = [] }
 libsqlite3-sys = { version = "0.30", features = ["bundled", "unlock_notify"] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -37,6 +37,8 @@ tauri-plugin-fs = "2.5.2"
 tauri-plugin-clipboard-manager = "2.3.3"
 tauri-plugin-updater = "2.11.0"
 tauri-plugin-process = "2.3.1"
+tauri-plugin-global-shortcut = "2.3.2"
+tauri-plugin-autostart = "2.5.1"
 
 # tauri-plugin-sql's sqlite feature links the system libsqlite3 by default,
 # which is fragile across distros (e.g. a clean build failed on Arch with an

@@ -1,6 +1,6 @@
 pkgbase = chronos
 	pkgdesc = A manual, local-first time tracker with a CLI companion, built with Tauri and React
-	pkgver = 0.3.7
+	pkgver = 0.4.0
 	pkgrel = 1
 	url = https://github.com/RickCaleg/chronos
 	arch = x86_64
@@ -13,7 +13,8 @@ pkgbase = chronos
 	depends = gtk3
 	depends = hicolor-icon-theme
 	depends = desktop-file-utils
-	source = chronos::git+https://github.com/RickCaleg/chronos.git#tag=v0.3.7
+	depends = libayatana-appindicator
+	source = chronos::git+https://github.com/RickCaleg/chronos.git#tag=v0.4.0
 	sha256sums = SKIP
 
 pkgname = chronos
