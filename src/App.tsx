@@ -7,6 +7,10 @@ import { SettingsView } from "./components/settings/SettingsView";
 import { useProjectsStore } from "./store/useProjectsStore";
 import { useEntriesStore } from "./store/useEntriesStore";
 import { useUpdaterStore } from "./store/useUpdaterStore";
+import { runAutoBackupIfDue } from "./lib/autoBackup";
+
+/** How often to re-check whether an auto-backup is due while the app stays open. */
+const AUTO_BACKUP_CHECK_INTERVAL_MS = 15 * 60 * 1000;
 
 function App() {
   const [view, setView] = useState<View>("timer");
@@ -21,6 +25,12 @@ function App() {
     loadEntries();
     useUpdaterStore.getState().checkForUpdates();
   }, [loadProjects, loadEntries]);
+
+  useEffect(() => {
+    runAutoBackupIfDue();
+    const id = setInterval(runAutoBackupIfDue, AUTO_BACKUP_CHECK_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {

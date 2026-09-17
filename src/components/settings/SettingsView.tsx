@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Download, FileSpreadsheet, RefreshCw, Trash2, Upload } from "lucide-react";
-import { confirm } from "@tauri-apps/plugin-dialog";
+import { Download, FileSpreadsheet, FolderOpen, RefreshCw, Save, Trash2, Upload } from "lucide-react";
+import { confirm, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getVersion } from "@tauri-apps/api/app";
 import { useThemeStore, type ThemePreference } from "../../store/useThemeStore";
 import { useProjectsStore } from "../../store/useProjectsStore";
 import { useEntriesStore } from "../../store/useEntriesStore";
 import { useAppSettingsStore } from "../../store/useAppSettingsStore";
+import { useAutoBackupStore } from "../../store/useAutoBackupStore";
 import { useUpdaterStore } from "../../store/useUpdaterStore";
 import { Button } from "../ui/Button";
 import { Switch } from "../ui/Switch";
@@ -19,7 +20,16 @@ import {
   importJsonBackup,
   resetAllData,
 } from "../../lib/exportImport";
+import { performAutoBackup } from "../../lib/autoBackup";
+import { formatDayLabel, formatTimeShort } from "../../lib/time";
 import { cn } from "../../lib/cn";
+
+const AUTO_BACKUP_INTERVAL_OPTIONS: { hours: number; labelKey: string }[] = [
+  { hours: 1, labelKey: "settings.autoBackupHourly" },
+  { hours: 6, labelKey: "settings.autoBackupEvery6h" },
+  { hours: 24, labelKey: "settings.autoBackupDaily" },
+  { hours: 168, labelKey: "settings.autoBackupWeekly" },
+];
 
 const LANGUAGE_LABELS: Record<string, string> = {
   en: "English",
@@ -36,13 +46,39 @@ export function SettingsView() {
   const { t, i18n } = useTranslation();
   const { theme, setTheme, omarchyAvailable } = useThemeStore();
   const { groupSimilarEntries, setGroupSimilarEntries } = useAppSettingsStore();
+  const autoBackup = useAutoBackupStore();
   const updater = useUpdaterStore();
   const [appVersion, setAppVersion] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [backupStatus, setBackupStatus] = useState<string | null>(null);
+  const [backingUp, setBackingUp] = useState(false);
 
   useEffect(() => {
     getVersion().then(setAppVersion);
   }, []);
+
+  async function handleChooseBackupFolder() {
+    const path = await openDialog({ directory: true, multiple: false });
+    if (!path || Array.isArray(path)) return;
+    autoBackup.setFolder(path);
+  }
+
+  async function handleBackupNow() {
+    if (!autoBackup.folder) {
+      setBackupStatus(t("settings.autoBackupNeedsFolder"));
+      return;
+    }
+    setBackupStatus(null);
+    setBackingUp(true);
+    try {
+      await performAutoBackup();
+      setBackupStatus(t("settings.exportSuccess"));
+    } catch (err) {
+      setBackupStatus(t("settings.operationFailed", { error: String(err) }));
+    } finally {
+      setBackingUp(false);
+    }
+  }
 
   const themeOptions = omarchyAvailable
     ? [...BASE_THEME_OPTIONS, { value: "omarchy" as const, labelKey: "settings.themeOmarchy" }]
@@ -187,7 +223,7 @@ export function SettingsView() {
         )}
       </section>
 
-      <section className="rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+      <section className="mb-6 rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
         <h2 className="mb-1 text-sm font-medium">{t("settings.dataTitle")}</h2>
         <p className="mb-4 text-xs text-[var(--color-text-muted)]">{t("settings.dataDescription")}</p>
 
@@ -222,7 +258,70 @@ export function SettingsView() {
         {status && <p className="mt-3 text-sm">{status}</p>}
       </section>
 
-      <section className="mt-6 rounded-[2px] border border-[var(--color-danger)] p-4">
+      <section className="mb-6 rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <div className="mb-3 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-sm font-medium">{t("settings.autoBackupTitle")}</h2>
+            <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{t("settings.autoBackupDescription")}</p>
+          </div>
+          <Switch checked={autoBackup.enabled} onChange={autoBackup.setEnabled} label={t("settings.autoBackupEnable")} />
+        </div>
+
+        {autoBackup.enabled && (
+          <div className="space-y-4 border-t border-[var(--color-border)] pt-4">
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-[var(--color-text-muted)]">{t("settings.autoBackupFolder")}</p>
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate rounded-[2px] border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs text-[var(--color-text-muted)]">
+                  {autoBackup.folder ?? t("settings.autoBackupNoFolder")}
+                </span>
+                <Button variant="secondary" size="sm" onClick={handleChooseBackupFolder}>
+                  <FolderOpen size={14} />
+                  {t("settings.autoBackupChooseFolder")}
+                </Button>
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-[var(--color-text-muted)]">{t("settings.autoBackupInterval")}</p>
+              <div className="flex flex-wrap gap-2">
+                {AUTO_BACKUP_INTERVAL_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.hours}
+                    onClick={() => autoBackup.setIntervalHours(opt.hours)}
+                    className={cn(
+                      "rounded-[2px] border px-3 py-1.5 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]",
+                      autoBackup.intervalHours === opt.hours
+                        ? "border-[var(--color-accent)] text-[var(--color-accent)]"
+                        : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)]",
+                    )}
+                  >
+                    {t(opt.labelKey)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-[var(--color-text-muted)]">
+                {autoBackup.lastBackupAt
+                  ? t("settings.autoBackupLast", {
+                      time: `${formatDayLabel(autoBackup.lastBackupAt, i18n.language)}, ${formatTimeShort(autoBackup.lastBackupAt, i18n.language)}`,
+                    })
+                  : t("settings.autoBackupNever")}
+              </p>
+              <Button variant="secondary" size="sm" onClick={handleBackupNow} disabled={backingUp}>
+                <Save size={14} />
+                {t("settings.autoBackupNow")}
+              </Button>
+            </div>
+
+            {backupStatus && <p className="text-sm">{backupStatus}</p>}
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-[2px] border border-[var(--color-danger)] p-4">
         <h2 className="mb-1 text-sm font-medium text-[var(--color-danger)]">{t("settings.dangerZone")}</h2>
         <p className="mb-3 text-xs text-[var(--color-text-muted)]">{t("settings.resetAllDescription")}</p>
         <Button variant="danger" onClick={handleReset}>
