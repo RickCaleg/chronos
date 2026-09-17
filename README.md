@@ -38,6 +38,8 @@ A manual time tracker for people who just want to press play, work, and press st
   makepkg -si
   ```
   This installs `chronos` and `chronos-cli` via pacman, with a proper `.desktop` entry and icons. Once AUR registration reopens we'll publish it there too.
+
+  Always get the `PKGBUILD` this way (a fresh clone of `master`), not from inside a downloaded release archive/zip — packaging fixes ship as plain commits to `packaging/aur/` without a new app release, so a `PKGBUILD` frozen inside an old release's source archive can be missing them.
 - **Other Linux / Windows**: grab an installer from the [latest release](https://github.com/RickCaleg/chronos/releases/latest) (`.deb`, `.rpm`, `.AppImage`, or `.msi`/`.exe`).
 
 ## Getting started

@@ -1,4 +1,9 @@
 # Maintainer: Richardson Calegari Saconi <richardson.saconi@outlook.com>
+#
+# Packaging-only fixes (this file) ship as plain commits to master without a
+# new app release/tag. If you got this PKGBUILD from inside a downloaded
+# release archive/zip instead of `git clone`, it may be stale — compare
+# pkgrel against https://github.com/RickCaleg/chronos/blob/master/packaging/aur/PKGBUILD
 pkgname=chronos
 pkgver=0.3.6
 pkgrel=2
