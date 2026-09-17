@@ -5,7 +5,7 @@ All notable changes to Chronos are documented here. Format loosely follows
 
 ## [Unreleased]
 ### Added
-- Optional automatic backups to a folder of your choice, in Settings (off by default).
+- Optional automatic backups to a folder of your choice, in Settings (off by default), with a configurable retention count (presets or a custom number; use 1 to always overwrite with just the latest).
 ### Fixed
 - "Today" sorting last in the records list when it had no finished entries yet (only a running timer).
 

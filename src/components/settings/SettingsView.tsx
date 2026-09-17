@@ -10,6 +10,7 @@ import { useAppSettingsStore } from "../../store/useAppSettingsStore";
 import { useAutoBackupStore } from "../../store/useAutoBackupStore";
 import { useUpdaterStore } from "../../store/useUpdaterStore";
 import { Button } from "../ui/Button";
+import { Input } from "../ui/Input";
 import { Switch } from "../ui/Switch";
 import { SUPPORTED_LANGUAGES } from "../../i18n";
 import {
@@ -30,6 +31,8 @@ const AUTO_BACKUP_INTERVAL_OPTIONS: { hours: number; labelKey: string }[] = [
   { hours: 24, labelKey: "settings.autoBackupDaily" },
   { hours: 168, labelKey: "settings.autoBackupWeekly" },
 ];
+
+const AUTO_BACKUP_RETENTION_PRESETS = [1, 5, 10, 20, 50];
 
 const LANGUAGE_LABELS: Record<string, string> = {
   en: "English",
@@ -52,10 +55,24 @@ export function SettingsView() {
   const [status, setStatus] = useState<string | null>(null);
   const [backupStatus, setBackupStatus] = useState<string | null>(null);
   const [backingUp, setBackingUp] = useState(false);
+  const [retentionInput, setRetentionInput] = useState(String(autoBackup.retentionCount));
 
   useEffect(() => {
     getVersion().then(setAppVersion);
   }, []);
+
+  useEffect(() => {
+    setRetentionInput(String(autoBackup.retentionCount));
+  }, [autoBackup.retentionCount]);
+
+  function commitRetentionInput() {
+    const parsed = Number(retentionInput);
+    if (Number.isFinite(parsed) && parsed >= 1) {
+      autoBackup.setRetentionCount(parsed);
+    } else {
+      setRetentionInput(String(autoBackup.retentionCount));
+    }
+  }
 
   async function handleChooseBackupFolder() {
     const path = await openDialog({ directory: true, multiple: false });
@@ -299,6 +316,44 @@ export function SettingsView() {
                     {t(opt.labelKey)}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-0.5 text-xs font-medium text-[var(--color-text-muted)]">{t("settings.autoBackupRetention")}</p>
+              <p className="mb-1.5 text-xs text-[var(--color-text-muted)]">{t("settings.autoBackupRetentionDescription")}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {AUTO_BACKUP_RETENTION_PRESETS.map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => autoBackup.setRetentionCount(n)}
+                    className={cn(
+                      "rounded-[2px] border px-3 py-1.5 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]",
+                      autoBackup.retentionCount === n
+                        ? "border-[var(--color-accent)] text-[var(--color-accent)]"
+                        : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)]",
+                    )}
+                  >
+                    {n}
+                  </button>
+                ))}
+                <Input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={retentionInput}
+                  onChange={(e) => setRetentionInput(e.target.value)}
+                  onBlur={commitRetentionInput}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                  }}
+                  aria-label={t("settings.autoBackupRetentionCustom")}
+                  className={cn(
+                    "h-[34px] w-20 text-center",
+                    !AUTO_BACKUP_RETENTION_PRESETS.includes(autoBackup.retentionCount) &&
+                      "border-[var(--color-accent)] text-[var(--color-accent)]",
+                  )}
+                />
               </div>
             </div>
 

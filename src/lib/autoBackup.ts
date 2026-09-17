@@ -8,8 +8,6 @@ import { useAutoBackupStore } from "../store/useAutoBackupStore";
 
 const FILE_PREFIX = "chronos-auto-backup-";
 const FILE_SUFFIX = ".json";
-/** How many auto-backups to keep in the target folder before pruning the oldest. Not user-configurable, to keep the feature's settings surface small. */
-const RETENTION_COUNT = 20;
 
 function backupFileName(iso: string): string {
   // Colons aren't safe in filenames on Windows.
@@ -17,14 +15,16 @@ function backupFileName(iso: string): string {
   return `${FILE_PREFIX}${safe}${FILE_SUFFIX}`;
 }
 
+/** Deletes the oldest auto-backups beyond `retentionCount`. A count of 1 keeps just the latest, i.e. each backup overwrites the previous one. */
 async function cleanupOldBackups(folder: string): Promise<void> {
+  const { retentionCount } = useAutoBackupStore.getState();
   const dirEntries = await readDir(folder);
   const names = dirEntries
     .filter((e) => e.isFile && e.name.startsWith(FILE_PREFIX) && e.name.endsWith(FILE_SUFFIX))
     .map((e) => e.name)
     .sort();
 
-  const excess = names.length - RETENTION_COUNT;
+  const excess = names.length - retentionCount;
   if (excess <= 0) return;
 
   for (const name of names.slice(0, excess)) {
