@@ -1,6 +1,6 @@
 # Maintainer: Richardson Calegari Saconi <richardson.saconi@outlook.com>
 pkgname=chronos
-pkgver=0.3.5
+pkgver=0.3.6
 pkgrel=1
 pkgdesc="A manual, local-first time tracker with a CLI companion, built with Tauri and React"
 arch=('x86_64')
@@ -9,7 +9,7 @@ license=('MIT')
 depends=('webkit2gtk-4.1' 'gtk3' 'hicolor-icon-theme' 'desktop-file-utils')
 makedepends=('rust' 'nodejs' 'npm')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/RickCaleg/chronos/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('acb6aa9055f291d984977310cd9e029860fc6e9ce700e818fd3fd1ed04435fec')
+sha256sums=('aabaeab0d84b460b13c23ee40d1d85eb05baf69f33afe305cc95431f0fedf3cd')
 
 build() {
   cd "$pkgname-$pkgver"

@@ -5,13 +5,17 @@ All notable changes to Chronos are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-09-17
+### Fixed
+- From-source Linux builds could still fail to link with `undefined symbol: sqlite3_unlock_notify`, deterministically, even with the 0.3.5 fix in place. Root cause: `libsqlite3-sys` 0.28's bundled build had a linking issue with `sqlx-macros` (a proc-macro, built via a separate compilation unit) that adding Cargo features couldn't work around. Fixed by updating `sqlx` to 0.8.6 (pulling in `libsqlite3-sys` 0.30.1) and `rusqlite` to 0.32.1 to match — verified with two independent from-scratch builds.
+
 ## [0.3.5] - 2026-09-16
 ### Fixed
-- From-source Linux builds failing to link with `undefined symbol: sqlite3_unlock_notify`. `sqlx-sqlite` calls that function unconditionally, but it only exists in SQLite's amalgamation when compiled with `SQLITE_ENABLE_UNLOCK_NOTIFY` — `libsqlite3-sys`'s `bundled` feature doesn't set that by default. Added the `unlock_notify` feature alongside it.
+- Attempted fix for the `sqlite3_unlock_notify` linking issue (see 0.3.6 for the actual fix) by adding `libsqlite3-sys`'s `unlock_notify` feature alongside `bundled`. Necessary but not sufficient on its own.
 
 ## [0.3.4] - 2026-09-16
 ### Fixed
-- Attempted fix for the `sqlite3_unlock_notify` linking issue by also forcing `libsqlite3-sys`'s bundled feature under `[build-dependencies]` (superseded by the real fix in 0.3.5 — this alone wasn't sufficient).
+- Attempted fix for the `sqlite3_unlock_notify` linking issue by also forcing `libsqlite3-sys`'s bundled feature under `[build-dependencies]` (superseded by the real fix in 0.3.6 — this alone wasn't sufficient).
 
 ## [0.3.3] - 2026-09-16
 ### Fixed
