@@ -1,6 +1,6 @@
 [package]
 name = "chronos-proofhub-plugin"
-version = "0.5.3"
+version = "0.5.4"
 description = "Standalone ProofHub API bridge for Chronos, downloaded on demand by the desktop app"
 authors = ["Richardson Calegari Saconi"]
 license = "MIT"

@@ -4,6 +4,8 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.5.4] - 2026-09-18
 ### Fixed
 - The ProofHub plugin never updated along with the app: after an auto-update the old plugin kept running, which broke 0.5.3's task linking with "task wasn't found in the configured task list" (the older plugin didn't return the task's ticket number). The plugin is now automatically brought to the same version as Chronos on launch, and a mismatched plugin is never run.
 
