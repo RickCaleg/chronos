@@ -10,6 +10,7 @@ use serde_json::Value;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::RwLock;
 use tauri::{AppHandle, Manager};
 
 use crate::proofhub_credentials;
@@ -89,6 +90,49 @@ pub fn proofhub_plugin_status(app: AppHandle) -> Result<PluginStatus, String> {
 /// then writes it to disk.
 #[tauri::command]
 pub fn proofhub_plugin_install(app: AppHandle) -> Result<(), String> {
+    let _guard = PLUGIN_BINARY_LOCK.write().map_err(|e| e.to_string())?;
+    install_matching_version(&app)
+}
+
+/// Guards the plugin binary on disk: every plugin run holds a read lock for
+/// as long as the process is alive, and (re)installing takes the write lock,
+/// so the binary is never overwritten while a copy of it is running (which
+/// on Windows would fail outright with "file in use").
+static PLUGIN_BINARY_LOCK: RwLock<()> = RwLock::new(());
+
+/// Keeps the installed plugin in lockstep with the running app: the plugin
+/// is only ever downloaded at install time, so after the app auto-updates
+/// the old plugin would otherwise keep running against a newer app — a real
+/// bug report (0.5.3's ticket->id task resolution failing with "task not
+/// found") was exactly that, an app at 0.5.3 still talking to a 0.5.2
+/// plugin whose `list-tasks` didn't return `ticket` yet. Reinstalls from the
+/// app's own release tag whenever the recorded plugin version differs.
+/// No-op when the plugin isn't installed at all (the user never opted in).
+pub fn ensure_plugin_matches_app(app: &AppHandle) -> Result<(), String> {
+    if !binary_path(app)?.exists() || installed_version_matches(app)? {
+        return Ok(());
+    }
+    let _guard = PLUGIN_BINARY_LOCK.write().map_err(|e| e.to_string())?;
+    // Re-check under the write lock: a concurrent call may have just updated it.
+    if installed_version_matches(app)? {
+        return Ok(());
+    }
+    let installed = std::fs::read_to_string(version_path(app)?).unwrap_or_default();
+    install_matching_version(app).map_err(|e| {
+        format!(
+            "The ProofHub plugin (v{}) doesn't match Chronos v{} and couldn't be updated: {e}",
+            installed.trim(),
+            app.package_info().version
+        )
+    })
+}
+
+fn installed_version_matches(app: &AppHandle) -> Result<bool, String> {
+    let installed = std::fs::read_to_string(version_path(app)?).unwrap_or_default();
+    Ok(installed.trim() == app.package_info().version.to_string())
+}
+
+fn install_matching_version(app: &AppHandle) -> Result<(), String> {
     let asset = asset_name()?;
     let version = app.package_info().version.to_string();
     let base = format!("https://github.com/{REPO}/releases/download/v{version}");
@@ -124,7 +168,7 @@ pub fn proofhub_plugin_install(app: AppHandle) -> Result<(), String> {
         .verify(&binary_bytes, &signature, false)
         .map_err(|_| "The downloaded plugin failed signature verification and was not installed.".to_string())?;
 
-    let path = binary_path(&app)?;
+    let path = binary_path(app)?;
     std::fs::write(&path, &binary_bytes).map_err(|e| e.to_string())?;
 
     #[cfg(unix)]
@@ -135,7 +179,7 @@ pub fn proofhub_plugin_install(app: AppHandle) -> Result<(), String> {
         std::fs::set_permissions(&path, perms).map_err(|e| e.to_string())?;
     }
 
-    std::fs::write(version_path(&app)?, &version).map_err(|e| e.to_string())?;
+    std::fs::write(version_path(app)?, &version).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -144,6 +188,7 @@ pub fn proofhub_plugin_install(app: AppHandle) -> Result<(), String> {
 /// plugin" and "disconnect the account" are distinct actions.
 #[tauri::command]
 pub fn proofhub_plugin_uninstall(app: AppHandle) -> Result<(), String> {
+    let _guard = PLUGIN_BINARY_LOCK.write().map_err(|e| e.to_string())?;
     let _ = std::fs::remove_file(binary_path(&app)?);
     let _ = std::fs::remove_file(version_path(&app)?);
     Ok(())
@@ -196,6 +241,8 @@ fn run_plugin(
     if !path.exists() {
         return Err("The ProofHub plugin isn't installed.".to_string());
     }
+    ensure_plugin_matches_app(app)?;
+    let _guard = PLUGIN_BINARY_LOCK.read().map_err(|e| e.to_string())?;
 
     let mut request = match payload {
         Value::Object(map) => map,

@@ -226,6 +226,16 @@ New module `src-tauri/src/proofhub_plugin.rs`:
      `~/.local/share/com.richardson.chronos/plugins/` on Linux), `chmod
      755` on Unix.
   5. Records the installed version in the `settings` table (§4.2).
+- Staying in lockstep after app updates: install alone only pins the
+  plugin to the app version *at install time*, and the app auto-updates
+  on its own — so a 0.5.3 app could keep running a 0.5.2 plugin
+  indefinitely (a real bug: 0.5.3's ticket→id task resolution needs the
+  `ticket` field only the 0.5.3 plugin returns, so every task came back
+  "not found"). `ensure_plugin_matches_app` re-runs the install steps
+  above whenever the recorded plugin version differs from the app's: once
+  in the background at startup, and again before every plugin call, which
+  refuses to run a mismatched plugin (surfacing the update error instead).
+  Never installs anything if the plugin wasn't installed to begin with.
 - `#[tauri::command] proofhub_plugin_uninstall()`: deletes the binary and
   the installed-version row. Does **not** touch already-synced entries'
   `proofhub_time_entry_id`/`proofhub_synced_at` (§4.1) or a previously

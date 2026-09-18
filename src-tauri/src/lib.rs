@@ -276,6 +276,15 @@ pub fn run() {
 
             app.manage(TrayMenuItems { toggle_timer: toggle_timer_item });
 
+            // Right after an app update, bring an installed ProofHub plugin up
+            // to the same version in the background, so the first sync doesn't
+            // wait on the download. Failures are fine to ignore here — every
+            // plugin call re-checks and surfaces the error then.
+            let plugin_app = app.handle().clone();
+            std::thread::spawn(move || {
+                let _ = proofhub_plugin::ensure_plugin_matches_app(&plugin_app);
+            });
+
             let mut tray = TrayIconBuilder::new().menu(&menu).show_menu_on_left_click(true);
             if let Some(icon) = app.default_window_icon() {
                 tray = tray.icon(icon.clone());
