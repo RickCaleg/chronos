@@ -179,9 +179,12 @@ Envelope shape on failure: `{"ok":false,"error":{"status":401,"message":"..."}}`
 so the main app can distinguish auth failures, rate limits, and validation
 errors (§9) without parsing ProofHub's raw response body itself.
 
-Actions, matching §2.2's endpoints one-to-one: `test-connection`,
-`list-projects`, `list-timesheets`, `create-timesheet`, `list-todolists`,
-`list-tasks`, `push-entry`, `update-entry`.
+Actions: `test-connection`, `list-projects`, `list-timesheets`,
+`list-todolists`, `push-entry`, `update-entry`. No `create-timesheet` or
+`list-tasks` — see §6's note on why task-level linking dropped the
+per-project task picker (and, with it, the need to browse a project's
+tasks at all), and why timesheet creation isn't offered either (every
+real user already has one — see §6).
 
 Deliberately **no database access and no credential storage** in this
 binary — it only knows how to talk to ProofHub, given credentials handed to
@@ -257,9 +260,12 @@ copy of the private key was kept outside GitHub's secret store.
 platform in the matrix (mirroring the existing `chronos-cli` staging step)
 and signs each binary before upload. Neither the `rsign` nor `minisign` CLI
 tools accept the decryption password non-interactively (TTY prompt only,
-which a CI runner doesn't have) — `xtask/src/sign_plugin.rs` is a small
+which a CI runner doesn't have) — `xtask/src/sign_file.rs` is a small
 internal helper (not shipped) that calls the `minisign` crate's library API
-directly instead, reading the key/password from the same two secrets.
+directly instead, reading the key/password from generic `SIGNING_PRIVATE_KEY`
+env vars the workflow maps onto whichever secret pair is relevant for that
+call (also reused to re-sign the AppImage after
+`packaging/appimage/strip-bundled-libs.sh` — see CHANGELOG.md).
 Verified end-to-end locally: signed with this exact xtask, verified with
 the exact `minisign-verify` call `proofhub_plugin_install` uses.
 
@@ -367,10 +373,11 @@ user who never installs.
    step 3.
 3. **Connected — project mapping table:** one row per non-archived Chronos
    project: a ProofHub-project dropdown, a timesheet dropdown for that
-   project (plus a **"Create 'Chronos time' timesheet"** convenience
-   button), an optional "link to a specific task" disclosure
-   (todolist+task), and a default billable toggle. Unmapped Chronos
-   projects show no sync affordance anywhere in the app.
+   project, an optional "link entries by task number" disclosure (a single
+   default-todolist dropdown — see §7 for why there's no per-project task
+   picker), and a default billable toggle. Unmapped Chronos projects show
+   no sync affordance anywhere in the app. No "create a timesheet"
+   convenience — every real ProofHub user already has one to pick from.
 4. **"Disconnect"** clears the credential and `proofhub.*` mapping/enabled
    settings, dropping back to step 2's empty form. **"Uninstall"** (a
    separate action, further down) removes the downloaded binary entirely
@@ -388,7 +395,7 @@ user who never installs.
 | Duration | `logged_hours` + `logged_mins` | Converted from `duration_seconds`. |
 | Entry's calendar day | `date` | `YYYY-MM-DD`, from the entry's local start time. |
 | (mapping's default) | `status` (billable/none) | Per-project default, overridable per push. |
-| task_number match (optional) | `list_id` + `task_id` | Best-effort only if task-level linking is configured — never required for a push to succeed. |
+| Task number (optional) | `task_id` (+ mapping's `list_id`) | **Per-entry, not per-project**: if the entry has a `taskNumber` (e.g. `#1234`) *and* the project mapping has a default task list configured, the number (stripped of its `#`) is sent as `task_id` alongside that list's id. Either one missing just logs at the project/timesheet level — task-level linking is never required for a push to succeed. Chronos doesn't validate that the number is actually a real ProofHub task id in that list; a bad one is ProofHub's `4xx` to reject (§9). |
 
 ## 8. Push UX
 
@@ -470,16 +477,23 @@ ask), targeting v0.5.0:**
   storage (§5).
 - Migration v4 (§4.1) + CLI mirror.
 - Settings UI through step 3 of §6 (install → connect → per-project
-  mapping, including "create timesheet" convenience).
+  mapping).
 - Per-entry manual push + sync badge (§8.1) + error handling (§9).
 
 **Phase 2 — batch push + task-level linking. Status: done.**
 - "Send day to ProofHub" (§8.2) — shipped in Phase 1 already, ahead of
   schedule (it was cheap to add alongside the per-entry badge).
-- Optional todolist+task mapping and `list_id`/`task_id` on push — a
-  collapsed "Link to a specific task" disclosure per project mapping row
-  (`ProjectMappingRow` in `ProofHubSettings.tsx`), collapsed by default per
-  §6's "most users will be fine at the project/timesheet level."
+- Task-level linking on push (`list_id`/`task_id`) — revised mid-Phase-2
+  based on user feedback from a per-project fixed task picker (wrong model:
+  a Chronos project maps to many different ProofHub tasks over time via
+  each entry's own task number, not one fixed task) to the per-entry model
+  in §7's table: a project mapping optionally names a default task list,
+  and each pushed entry supplies its own task id via `taskNumber`. Dropped
+  the `list-tasks` plugin action and the per-project task `<Select>`
+  entirely along with it — nothing left to browse.
+- Also dropped the "create a timesheet" convenience button per the same
+  feedback: real ProofHub users always already have one to pick from, so
+  `create-timesheet` was removed from the plugin binary too.
 - Re-sync flow for edited entries (§8.3) — the functional behavior (PUT
   instead of POST once `proofhubTimeEntryId` exists) was already correct
   from Phase 1's `pushEntryToProofHub`; added the missing third visual

@@ -161,8 +161,6 @@
     "noProjects": "Ainda não há projetos ativos para mapear.",
     "selectProject": "Projeto no ProofHub…",
     "selectTimesheet": "Timesheet…",
-    "createTimesheet": "Criar \"Chronos time\"",
-    "defaultTimesheetTitle": "Chronos time",
     "billableByDefault": "Faturável por padrão",
     "unmap": "Remover mapeamento",
     "sendToProofHub": "Enviar para o ProofHub",
@@ -172,10 +170,9 @@
     "sendDay": "Enviar dia para o ProofHub",
     "sendDayConfirm": "Enviar {{count}} registros ({{hours}} no total) para o ProofHub?",
     "sendDayPartialFailure": "{{count}} registros não puderam ser enviados — confira individualmente.",
-    "linkTask": "Vincular a uma task específica (opcional)",
-    "taskLinked": "Vinculado a uma task",
-    "selectTodolist": "Lista de tasks…",
-    "selectTask": "Task…",
-    "clearTaskLink": "Remover vínculo de task"
+    "linkTask": "Vincular lançamentos pelo número da task (opcional)",
+    "taskLinked": "Vinculando lançamentos pelo número da task",
+    "taskLinkHint": "Lançamentos com número de task (ex: #1234) serão registrados nesse id de task dentro dessa lista. Sem número de task, o lançamento fica no nível de projeto/timesheet.",
+    "selectTodolist": "Lista de tasks…"
   }
 }

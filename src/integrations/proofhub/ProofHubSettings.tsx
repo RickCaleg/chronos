@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronRight, Loader2, Plug, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, Loader2, Plug, Trash2 } from "lucide-react";
 import { useProofHubStore } from "./useProofHubStore";
 import { useProjectsStore } from "../../store/useProjectsStore";
 import { Button } from "../../components/ui/Button";
@@ -8,7 +8,6 @@ import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
 import { Switch } from "../../components/ui/Switch";
 import { cn } from "../../lib/cn";
-import type { ProofHubProjectMapping } from "../../db/proofhubSettings";
 
 interface RemoteItem {
   id: string;
@@ -171,13 +170,10 @@ function ProjectMappingRow({
   const mapping = proofhub.projectMap[chronosProjectId];
   const [selectedProjectId, setSelectedProjectId] = useState(mapping?.proofhubProjectId ?? "");
   const [timesheets, setTimesheets] = useState<RemoteItem[] | null>(null);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [taskLinkOpen, setTaskLinkOpen] = useState(Boolean(mapping?.todolistId && mapping?.taskId));
-  const [selectedTodolistId, setSelectedTodolistId] = useState(mapping?.todolistId ?? "");
+  const [taskLinkOpen, setTaskLinkOpen] = useState(Boolean(mapping?.todolistId));
   const [todolists, setTodolists] = useState<RemoteItem[] | null>(null);
-  const [tasks, setTasks] = useState<RemoteItem[] | null>(null);
 
   useEffect(() => {
     if (!selectedProjectId) {
@@ -203,24 +199,6 @@ function ProjectMappingRow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskLinkOpen, selectedProjectId]);
 
-  useEffect(() => {
-    if (!selectedTodolistId) {
-      setTasks(null);
-      return;
-    }
-    proofhub
-      .call<RemoteItem[]>("list-tasks", { projectId: selectedProjectId, todolistId: selectedTodolistId })
-      .then(setTasks)
-      .catch((err) => setError(String(err)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTodolistId]);
-
-  const applyMapping = async (patch: Partial<ProofHubProjectMapping>) => {
-    const proofhubProject = proofhubProjects.find((p) => p.id === selectedProjectId);
-    if (!proofhubProject || !mapping) return;
-    await proofhub.setMapping(chronosProjectId, { ...mapping, ...patch });
-  };
-
   const applyInitialMapping = async (timesheet: RemoteItem) => {
     const proofhubProject = proofhubProjects.find((p) => p.id === selectedProjectId);
     if (!proofhubProject) return;
@@ -231,51 +209,17 @@ function ProjectMappingRow({
       timesheetTitle: timesheet.title,
       defaultBillable: mapping?.defaultBillable ?? true,
       ...(mapping?.todolistId ? { todolistId: mapping.todolistId } : {}),
-      ...(mapping?.taskId ? { taskId: mapping.taskId } : {}),
     });
   };
 
   const handleSelectTodolist = (todolistId: string) => {
-    setSelectedTodolistId(todolistId);
-    if (mapping) {
-      const { taskId: _drop, ...rest } = mapping;
+    if (!mapping) return;
+    if (todolistId) {
+      proofhub.setMapping(chronosProjectId, { ...mapping, todolistId });
+    } else {
+      const { todolistId: _drop, ...rest } = mapping;
       void _drop;
-      proofhub.setMapping(chronosProjectId, todolistId ? { ...rest, todolistId } : rest);
-    }
-  };
-
-  const handleSelectTask = (taskId: string) => {
-    if (mapping && selectedTodolistId && taskId) {
-      applyMapping({ todolistId: selectedTodolistId, taskId });
-    }
-  };
-
-  const handleClearTaskLink = () => {
-    setSelectedTodolistId("");
-    setTaskLinkOpen(false);
-    if (mapping) {
-      const { todolistId: _t, taskId: _k, ...rest } = mapping;
-      void _t;
-      void _k;
       proofhub.setMapping(chronosProjectId, rest);
-    }
-  };
-
-  const handleCreateTimesheet = async () => {
-    if (!selectedProjectId) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const created = await proofhub.call<RemoteItem>("create-timesheet", {
-        projectId: selectedProjectId,
-        title: t("proofhub.defaultTimesheetTitle"),
-      });
-      setTimesheets((prev) => [...(prev ?? []), created]);
-      await applyInitialMapping(created);
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -307,26 +251,21 @@ function ProjectMappingRow({
             </option>
           ))}
         </Select>
-        <div className="flex items-center gap-2">
-          <Select
-            value={mapping?.timesheetId ?? ""}
-            onChange={(e) => {
-              const timesheet = timesheets?.find((ts) => ts.id === e.target.value);
-              if (timesheet) applyInitialMapping(timesheet);
-            }}
-            disabled={!selectedProjectId || !timesheets}
-          >
-            <option value="">{t("proofhub.selectTimesheet")}</option>
-            {(timesheets ?? []).map((ts) => (
-              <option key={ts.id} value={ts.id}>
-                {ts.title}
-              </option>
-            ))}
-          </Select>
-          <Button variant="secondary" size="sm" onClick={handleCreateTimesheet} disabled={!selectedProjectId || busy}>
-            {t("proofhub.createTimesheet")}
-          </Button>
-        </div>
+        <Select
+          value={mapping?.timesheetId ?? ""}
+          onChange={(e) => {
+            const timesheet = timesheets?.find((ts) => ts.id === e.target.value);
+            if (timesheet) applyInitialMapping(timesheet);
+          }}
+          disabled={!selectedProjectId || !timesheets}
+        >
+          <option value="">{t("proofhub.selectTimesheet")}</option>
+          {(timesheets ?? []).map((ts) => (
+            <option key={ts.id} value={ts.id}>
+              {ts.title}
+            </option>
+          ))}
+        </Select>
       </div>
       {mapping && (
         <div className="mt-2 flex items-center gap-2">
@@ -343,12 +282,15 @@ function ProjectMappingRow({
             className="flex items-center gap-1 text-xs text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
           >
             <ChevronRight size={12} className={cn("transition-transform", taskLinkOpen && "rotate-90")} />
-            {mapping.todolistId && mapping.taskId ? t("proofhub.taskLinked") : t("proofhub.linkTask")}
+            {mapping.todolistId ? t("proofhub.taskLinked") : t("proofhub.linkTask")}
           </button>
+          {mapping.todolistId && (
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">{t("proofhub.taskLinkHint")}</p>
+          )}
 
           {taskLinkOpen && (
-            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <Select value={selectedTodolistId} onChange={(e) => handleSelectTodolist(e.target.value)} disabled={!todolists}>
+            <div className="mt-2">
+              <Select value={mapping.todolistId ?? ""} onChange={(e) => handleSelectTodolist(e.target.value)} disabled={!todolists}>
                 <option value="">{t("proofhub.selectTodolist")}</option>
                 {(todolists ?? []).map((tl) => (
                   <option key={tl.id} value={tl.id}>
@@ -356,31 +298,6 @@ function ProjectMappingRow({
                   </option>
                 ))}
               </Select>
-              <div className="flex items-center gap-2">
-                <Select
-                  value={mapping.taskId ?? ""}
-                  onChange={(e) => handleSelectTask(e.target.value)}
-                  disabled={!selectedTodolistId || !tasks}
-                >
-                  <option value="">{t("proofhub.selectTask")}</option>
-                  {(tasks ?? []).map((task) => (
-                    <option key={task.id} value={task.id}>
-                      {task.title}
-                    </option>
-                  ))}
-                </Select>
-                {mapping.todolistId && mapping.taskId && (
-                  <button
-                    type="button"
-                    onClick={handleClearTaskLink}
-                    aria-label={t("proofhub.clearTaskLink")}
-                    title={t("proofhub.clearTaskLink")}
-                    className="shrink-0 rounded-[2px] p-1.5 text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-border)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
             </div>
           )}
         </div>

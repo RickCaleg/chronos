@@ -35,24 +35,10 @@ enum Request {
         project_id: String,
     },
     #[serde(rename_all = "camelCase")]
-    CreateTimesheet {
-        subdomain: String,
-        api_key: String,
-        project_id: String,
-        title: String,
-    },
-    #[serde(rename_all = "camelCase")]
     ListTodolists {
         subdomain: String,
         api_key: String,
         project_id: String,
-    },
-    #[serde(rename_all = "camelCase")]
-    ListTasks {
-        subdomain: String,
-        api_key: String,
-        project_id: String,
-        todolist_id: String,
     },
     #[serde(rename_all = "camelCase")]
     PushEntry {
@@ -171,21 +157,6 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
                 extract_list(&body, &["timesheets"]).into_iter().map(normalize_item).collect(),
             ))
         }
-        Request::CreateTimesheet {
-            subdomain,
-            api_key,
-            project_id,
-            title,
-        } => {
-            let body = post(
-                client,
-                &subdomain,
-                &api_key,
-                &format!("/projects/{project_id}/timesheets"),
-                &json!({ "title": title, "private": false }),
-            )?;
-            Ok(normalize_item(&body))
-        }
         Request::ListTodolists {
             subdomain,
             api_key,
@@ -199,22 +170,6 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
             )?;
             Ok(Value::Array(
                 extract_list(&body, &["todolists"]).into_iter().map(normalize_item).collect(),
-            ))
-        }
-        Request::ListTasks {
-            subdomain,
-            api_key,
-            project_id,
-            todolist_id,
-        } => {
-            let body = get(
-                client,
-                &subdomain,
-                &api_key,
-                &format!("/projects/{project_id}/todolists/{todolist_id}/tasks"),
-            )?;
-            Ok(Value::Array(
-                extract_list(&body, &["tasks"]).into_iter().map(normalize_item).collect(),
             ))
         }
         Request::PushEntry {

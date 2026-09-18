@@ -14,8 +14,13 @@ export interface ProofHubProjectMapping {
   timesheetId: string;
   timesheetTitle: string;
   defaultBillable: boolean;
+  /**
+   * Optional default task list, used for per-entry task-level linking: a
+   * pushed entry with a `taskNumber` (e.g. "#1234") sends `1234` as the
+   * ProofHub task id within this list. Without this set, entries always
+   * log at the project/timesheet level regardless of their task number.
+   */
   todolistId?: string;
-  taskId?: string;
 }
 
 export type ProofHubProjectMap = Record<string, ProofHubProjectMapping>;

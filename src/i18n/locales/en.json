@@ -161,8 +161,6 @@
     "noProjects": "No active projects to map yet.",
     "selectProject": "ProofHub project…",
     "selectTimesheet": "Timesheet…",
-    "createTimesheet": "Create \"Chronos time\"",
-    "defaultTimesheetTitle": "Chronos time",
     "billableByDefault": "Billable by default",
     "unmap": "Unmap",
     "sendToProofHub": "Send to ProofHub",
@@ -172,10 +170,9 @@
     "sendDay": "Send day to ProofHub",
     "sendDayConfirm": "Send {{count}} entries ({{hours}} total) to ProofHub?",
     "sendDayPartialFailure": "{{count}} entries couldn't be sent — check them individually.",
-    "linkTask": "Link to a specific task (optional)",
-    "taskLinked": "Linked to a task",
-    "selectTodolist": "Task list…",
-    "selectTask": "Task…",
-    "clearTaskLink": "Remove task link"
+    "linkTask": "Link entries by task number (optional)",
+    "taskLinked": "Linking entries by task number",
+    "taskLinkHint": "Entries with a task number (e.g. #1234) will log against that task id in this list. Entries without one still log at the project/timesheet level.",
+    "selectTodolist": "Task list…"
   }
 }

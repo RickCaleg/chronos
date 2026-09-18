@@ -14,6 +14,14 @@ export async function pushEntryToProofHub(entry: TimeEntry): Promise<void> {
   const loggedHours = Math.floor(totalMinutes / 60);
   const loggedMins = totalMinutes % 60;
 
+  // Task-level linking is per-entry, not a fixed choice per project: a
+  // mapped todolist plus this entry's own task number (e.g. "#1234") is
+  // what ProofHub needs for both list_id and task_id together (see
+  // docs/proofhub-integration.md section 2.2) — entries without a task
+  // number, or projects without a default task list, just log at the
+  // project/timesheet level.
+  const taskId = entry.taskNumber ? entry.taskNumber.replace(/^#/, "") : null;
+
   const basePayload = {
     projectId: mapping.proofhubProjectId,
     timesheetId: mapping.timesheetId,
@@ -22,7 +30,7 @@ export async function pushEntryToProofHub(entry: TimeEntry): Promise<void> {
     date: formatLocalDate(entry.startTime),
     status: mapping.defaultBillable ? "billable" : "none",
     description: entry.taskNumber ? `${entry.taskNumber} - ${entry.description}` : entry.description,
-    ...(mapping.todolistId && mapping.taskId ? { listId: mapping.todolistId, taskId: mapping.taskId } : {}),
+    ...(mapping.todolistId && taskId ? { listId: mapping.todolistId, taskId } : {}),
   };
 
   let proofhubTimeEntryId = entry.proofhubTimeEntryId;
