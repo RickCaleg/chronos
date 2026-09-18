@@ -155,6 +155,8 @@
     "manageInTab": "Instalado — conecte e gerencie os mapeamentos de projeto na aba ProofHub.",
     "projectMappings": "Mapeamento de projetos",
     "refresh": "Atualizar",
+    "groupPushesByDay": "Agrupar lançamentos da mesma task ao enviar um dia",
+    "groupPushesByDayDescription": "Lançamentos com a mesma task, descrição e projeto no mesmo dia são enviados ao ProofHub como um único registro somado, em vez de um por lançamento do Chronos.",
     "subdomain": "Subdomínio do ProofHub",
     "apiKey": "Chave de API",
     "apiKeyHint": "No ProofHub: ícone de perfil (canto inferior esquerdo) → API access.",

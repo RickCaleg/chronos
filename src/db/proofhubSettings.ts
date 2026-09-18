@@ -61,3 +61,25 @@ async function saveProjectMap(map: ProofHubProjectMap): Promise<void> {
     JSON.stringify(map),
   ]);
 }
+
+const GROUP_PUSHES_BY_DAY_KEY = "proofhub.groupPushesByDay";
+
+/**
+ * When on, "Send day to ProofHub" sums entries that share the same task
+ * number, description and project (the same criterion as the "group
+ * similar entries" display option — see lib/grouping.ts) into a single
+ * ProofHub time entry per group, instead of one push per Chronos entry.
+ */
+export async function getGroupPushesByDay(): Promise<boolean> {
+  const db = await getDb();
+  const rows = await db.select<SettingsRow[]>("SELECT value FROM settings WHERE key = $1", [GROUP_PUSHES_BY_DAY_KEY]);
+  return rows.length ? rows[0].value === "true" : false;
+}
+
+export async function setGroupPushesByDay(value: boolean): Promise<void> {
+  const db = await getDb();
+  await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ($1, $2)", [
+    GROUP_PUSHES_BY_DAY_KEY,
+    String(value),
+  ]);
+}

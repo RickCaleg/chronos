@@ -4,13 +4,14 @@ import { Check, Copy, Loader2, Send } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { confirm } from "@tauri-apps/plugin-dialog";
 import type { Project, TimeEntry } from "../../types";
-import type { EntryOrGroup } from "../../lib/grouping";
+import { groupSimilarEntries, type EntryOrGroup } from "../../lib/grouping";
 import { EntryRow } from "./EntryRow";
 import { GroupedEntryRow } from "./GroupedEntryRow";
 import { useProjectsStore } from "../../store/useProjectsStore";
 import { useLiveElapsed } from "../../hooks/useLiveElapsed";
 import { formatDateShort, formatDayLabel, formatDurationHuman } from "../../lib/time";
-import { isProofHubMappable, pushEntryToProofHub } from "../../integrations/proofhub/sync";
+import { isProofHubMappable, pushEntryToProofHub, pushGroupedEntriesToProofHub } from "../../integrations/proofhub/sync";
+import { useProofHubStore } from "../../integrations/proofhub/useProofHubStore";
 import i18n from "../../i18n";
 
 interface DayGroupProps {
@@ -62,9 +63,19 @@ export function DayGroup({ dayKey, label, items, runningEntry }: DayGroupProps) 
     setSendingDay(true);
     setSendError(null);
     let failures = 0;
-    for (const entry of pushable) {
+    // When "group pushes by day" is on, sum same-task/description/project
+    // entries into one ProofHub push instead of one per Chronos entry —
+    // same grouping criterion the "group similar entries" display option
+    // uses, applied here independently of whether that display option is on.
+    const groupPushes = useProofHubStore.getState().groupPushesByDay;
+    const toSend: TimeEntry[][] = groupPushes
+      ? groupSimilarEntries(pushable).map((item) => (Array.isArray(item) ? item : [item]))
+      : pushable.map((entry) => [entry]);
+
+    for (const group of toSend) {
       try {
-        await pushEntryToProofHub(entry);
+        if (group.length > 1) await pushGroupedEntriesToProofHub(group);
+        else await pushEntryToProofHub(group[0]);
         // A gentle pace under ProofHub's 25-requests/10s limit (docs/proofhub-integration.md section 2.3).
         await new Promise((resolve) => setTimeout(resolve, 300));
       } catch {

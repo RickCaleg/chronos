@@ -4,6 +4,10 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Added
+- Optional "group pushes by day": sums same-task/description/project entries into one ProofHub push instead of one per Chronos entry.
+### Fixed
+- Task-level linking was silently dropped on every re-push ("out of sync" retry) — the plugin's update-entry action never actually read the task/list id fields the app was already sending.
 
 ## [0.5.2] - 2026-09-18
 ### Changed

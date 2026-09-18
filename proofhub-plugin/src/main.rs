@@ -66,6 +66,8 @@ enum Request {
         date: String,
         status: String,
         description: String,
+        list_id: Option<String>,
+        task_id: Option<String>,
     },
 }
 
@@ -215,6 +217,8 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
             date,
             status,
             description,
+            list_id,
+            task_id,
         } => {
             put(
                 client,
@@ -229,8 +233,8 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
                     &date,
                     &status,
                     &description,
-                    None,
-                    None,
+                    list_id.as_deref(),
+                    task_id.as_deref(),
                 ),
             )?;
             Ok(Value::Null)

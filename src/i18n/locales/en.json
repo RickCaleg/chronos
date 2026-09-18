@@ -155,6 +155,8 @@
     "manageInTab": "Installed — connect and manage project mappings in the ProofHub tab.",
     "projectMappings": "Project mappings",
     "refresh": "Refresh",
+    "groupPushesByDay": "Group same-task entries when sending a day",
+    "groupPushesByDayDescription": "Entries with the same task, description and project on the same day are sent to ProofHub as a single summed entry instead of one per Chronos entry.",
     "subdomain": "ProofHub subdomain",
     "apiKey": "API key",
     "apiKeyHint": "In ProofHub: profile icon (bottom-left) → API access.",

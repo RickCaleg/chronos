@@ -20,6 +20,8 @@ interface ProofHubState {
   /** The connected ProofHub subdomain, or null if not connected. Never the API key. */
   subdomain: string | null;
   projectMap: ProofHubProjectMap;
+  /** "Send day to ProofHub" sums same-task/description/project entries into one push instead of one per Chronos entry — see db/proofhubSettings.ts. */
+  groupPushesByDay: boolean;
   busy: boolean;
   error: string | null;
 
@@ -41,6 +43,7 @@ interface ProofHubState {
   disconnect: () => Promise<void>;
   setMapping: (chronosProjectId: string, mapping: ProofHubProjectMapping) => Promise<void>;
   removeMapping: (chronosProjectId: string) => Promise<void>;
+  setGroupPushesByDay: (value: boolean) => Promise<void>;
   call: <T = unknown>(action: string, payload?: Record<string, unknown>) => Promise<T>;
 
   loadRemoteProjects: (force?: boolean) => Promise<RemoteItem[]>;
@@ -54,6 +57,7 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
   pluginVersion: null,
   subdomain: null,
   projectMap: {},
+  groupPushesByDay: false,
   busy: false,
   error: null,
   remoteProjects: null,
@@ -61,10 +65,11 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
   todolistsByProject: {},
 
   load: async () => {
-    const [status, subdomain, projectMap] = await Promise.all([
+    const [status, subdomain, projectMap, groupPushesByDay] = await Promise.all([
       invoke<PluginStatus>("proofhub_plugin_status"),
       invoke<string | null>("proofhub_connection_status"),
       proofhubDb.getProjectMap(),
+      proofhubDb.getGroupPushesByDay(),
     ]);
     set({
       loaded: true,
@@ -72,6 +77,7 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
       pluginVersion: status.version,
       subdomain,
       projectMap,
+      groupPushesByDay,
     });
   },
 
@@ -129,6 +135,11 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
   removeMapping: async (chronosProjectId) => {
     await proofhubDb.removeProjectMapping(chronosProjectId);
     set({ projectMap: await proofhubDb.getProjectMap() });
+  },
+
+  setGroupPushesByDay: async (value) => {
+    await proofhubDb.setGroupPushesByDay(value);
+    set({ groupPushesByDay: value });
   },
 
   call: (action, payload = {}) => invoke("proofhub_plugin_call", { action, payload }),

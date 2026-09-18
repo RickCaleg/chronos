@@ -450,6 +450,20 @@ fires requests sequentially with a small delay (§2.3's rate limit),
 continuing past individual failures. No "send week"/"send everything" bulk
 action in v1.
 
+**Optional "group pushes by day" setting** (`ProofHubView.tsx`, backed by
+`proofhub.groupPushesByDay` in the `settings` table): when on, "Send day"
+sums entries sharing the same task number, description and project (the
+identical criterion `lib/grouping.ts`'s `groupSimilarEntries` uses for the
+*display* grouping option, applied here independently of whether that
+display option is itself on) into **one** ProofHub push per group instead
+of one per Chronos entry — `sync.ts`'s `pushGroupedEntriesToProofHub`. All
+entries in a group end up sharing the same `proofhub_time_entry_id` /
+`proofhub_synced_at`, since one ProofHub time entry now represents all of
+them; editing just one afterward and re-pushing only it will overwrite the
+shared ProofHub entry with that single entry's hours, not re-sum the whole
+group — a known, accepted limitation rather than something this version
+tracks and reconciles.
+
 ### 8.3 Edits after a push
 
 Editing an already-synced entry clears `proofhub_synced_at` (keeps
@@ -457,6 +471,16 @@ Editing an already-synced entry clears `proofhub_synced_at` (keeps
 state; clicking it does a `PUT` (via `update-entry`) instead of a new
 `POST`. Deleting a synced Chronos entry does not delete it from ProofHub
 automatically.
+
+**Fixed bug (confirmed from a real report):** `update-entry`'s request
+struct in `proofhub-plugin/src/main.rs` never declared `list_id`/`task_id`
+fields at all, even though `sync.ts` always sent them when applicable —
+serde silently drops unknown JSON fields by default, so every re-push
+(every "out of sync" click) sent the entry without task-level linking
+regardless of the project mapping, degrading to project/timesheet-level
+logging with no error. `push-entry` (a genuine first push) was never
+affected. Fixed by adding the two fields to `UpdateEntry` and passing them
+through to `time_entry_body` the same way `PushEntry` already did.
 
 ### 8.4 No auto-push on stop
 

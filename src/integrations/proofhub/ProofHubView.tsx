@@ -105,6 +105,18 @@ export function ProofHubView() {
             </Button>
           </div>
 
+          <div className="flex items-center justify-between rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+            <div>
+              <p className="text-sm">{t("proofhub.groupPushesByDay")}</p>
+              <p className="text-xs text-[var(--color-text-muted)]">{t("proofhub.groupPushesByDayDescription")}</p>
+            </div>
+            <Switch
+              checked={proofhub.groupPushesByDay}
+              onChange={proofhub.setGroupPushesByDay}
+              label={t("proofhub.groupPushesByDay")}
+            />
+          </div>
+
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-medium">{t("proofhub.projectMappings")}</h2>
             <Button variant="ghost" size="sm" onClick={handleRefreshProjects} disabled={refreshing}>
