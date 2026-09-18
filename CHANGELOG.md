@@ -4,6 +4,8 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.5.5] - 2026-09-18
 ### Changed
 - Reworked ProofHub sending around one consistent model (see `docs/proofhub-integration.md` §8). Each row and each day's button send whatever isn't in ProofHub yet, and with "group pushes by day" on, a group is always sent with its full total.
 - The ✓ on an already-sent row or day is now clickable and sends it again. Entries deleted in ProofHub are recreated, and changed ones are overwritten.
