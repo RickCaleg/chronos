@@ -4,6 +4,8 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.5.2] - 2026-09-18
 ### Changed
 - ProofHub now gets its own top-level tab (once installed) instead of living inside Settings, and its remote project/timesheet/task-list data is cached instead of refetched on every visit.
 ### Fixed
