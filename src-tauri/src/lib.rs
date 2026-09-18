@@ -92,6 +92,22 @@ fn unregister_global_shortcut(app: tauri::AppHandle) -> Result<(), String> {
     app.global_shortcut().unregister_all().map_err(|e| e.to_string())
 }
 
+/// Tauri's updater can only self-install an AppImage on Linux — it has no
+/// mechanism for a .deb/.rpm-installed binary (including our own AUR
+/// package, which unpacks a .deb), since there's no single file the app
+/// can just overwrite the way an AppImage lets it. Detected via the
+/// `$APPIMAGE` env var the AppImage runtime itself sets. Always true on
+/// Windows/macOS, where the updater's normal installer-replace flow works
+/// regardless of how the app was originally installed.
+#[tauri::command]
+fn updater_supported() -> bool {
+    if cfg!(target_os = "linux") {
+        std::env::var_os("APPIMAGE").is_some()
+    } else {
+        true
+    }
+}
+
 fn migrations() -> Vec<Migration> {
     vec![
         Migration {
@@ -236,6 +252,7 @@ pub fn run() {
             set_tray_timer_label,
             register_global_shortcut,
             unregister_global_shortcut,
+            updater_supported,
             proofhub_plugin::proofhub_plugin_status,
             proofhub_plugin::proofhub_plugin_install,
             proofhub_plugin::proofhub_plugin_uninstall,

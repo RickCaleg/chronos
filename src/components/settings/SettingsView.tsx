@@ -5,6 +5,7 @@ import { confirm, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { disable as disableAutostart, enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useThemeStore, type ThemePreference } from "../../store/useThemeStore";
 import { useProjectsStore } from "../../store/useProjectsStore";
 import { useEntriesStore } from "../../store/useEntriesStore";
@@ -72,6 +73,8 @@ export function SettingsView() {
   useEffect(() => {
     getVersion().then(setAppVersion);
     isAutostartEnabled().then(setAutostartOn).catch(() => {});
+    updater.checkSelfUpdateSupport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleToggleAutostart(value: boolean) {
@@ -259,10 +262,24 @@ export function SettingsView() {
           <div className="mb-3 rounded-[2px] border border-[var(--color-accent)] bg-[var(--color-bg)] p-3">
             <p className="text-sm font-medium">{t("settings.updateAvailable", { version: updater.version })}</p>
             {updater.body && <p className="mt-1 whitespace-pre-line text-xs text-[var(--color-text-muted)]">{updater.body}</p>}
-            <Button variant="primary" size="sm" className="mt-2" onClick={updater.downloadAndInstall}>
-              <Download size={14} />
-              {t("settings.downloadInstall")}
-            </Button>
+            {updater.selfUpdateSupported === false ? (
+              <div className="mt-2">
+                <p className="mb-2 text-xs text-[var(--color-text-muted)]">{t("settings.selfUpdateUnsupported")}</p>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => openUrl("https://github.com/RickCaleg/chronos/releases/latest")}
+                >
+                  <Download size={14} />
+                  {t("settings.openReleasesPage")}
+                </Button>
+              </div>
+            ) : (
+              <Button variant="primary" size="sm" className="mt-2" onClick={updater.downloadAndInstall}>
+                <Download size={14} />
+                {t("settings.downloadInstall")}
+              </Button>
+            )}
           </div>
         )}
 
@@ -292,7 +309,11 @@ export function SettingsView() {
         )}
 
         {updater.status === "error" && (
-          <p className="mb-3 text-xs text-[var(--color-danger)]">{t("settings.updateCheckFailed", { error: updater.error })}</p>
+          <p className="mb-3 text-xs text-[var(--color-danger)]">
+            {t(updater.errorPhase === "install" ? "settings.updateInstallFailed" : "settings.updateCheckFailed", {
+              error: updater.error,
+            })}
+          </p>
         )}
 
         {updater.status !== "ready" && (
