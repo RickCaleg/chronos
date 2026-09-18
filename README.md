@@ -27,8 +27,9 @@ A manual time tracker for people who just want to press play, work, and press st
 - **Bilingual** — English and Portuguese (pt-BR), switchable in Settings.
 - **Theme-aware** — light, dark, follows the OS, or (on Linux) follows your [Omarchy](https://omarchy.org) theme live.
 - **Native by platform** — native title bar on Windows, native GTK decorations on Linux desktop environments, no title bar at all under a standalone window manager (Hyprland, sway, i3, ...).
-- **Your data stays yours** — a local SQLite database, no network calls, no telemetry, no account.
+- **Your data stays yours** — a local SQLite database, no telemetry, no account. The only two deliberate network exceptions are the self-updater below and the optional ProofHub integration, both off unless you turn them on.
 - **Self-updating** — checks GitHub Releases for a newer version on launch, plus a manual "Check for updates" button in Settings. Updates are cryptographically signed and verified before installing.
+- **Optional ProofHub integration** — install a signed companion plugin from Settings to push logged hours into [ProofHub](https://www.proofhub.com) projects and timesheets, with optional task-level linking. Nothing related to it — no code, no credentials, no network calls — touches your machine until you click Install. See [`docs/proofhub-integration.md`](docs/proofhub-integration.md) for the full design.
 
 ## Tech stack
 
