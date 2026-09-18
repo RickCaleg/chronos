@@ -4,6 +4,8 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Added
+- `packaging/appimage/install.sh` — downloads the AppImage, sets up a `.desktop` entry + icon so it shows up in your app launcher. See the README's Installing section.
 ### Fixed
 - In-app updates failing with a confusing "Failed to install package" on Linux installs other than the AppImage (.deb/.rpm/AUR) — self-update only works for AppImage; other installs now get a link to the releases page instead.
 

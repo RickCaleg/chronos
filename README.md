@@ -46,7 +46,12 @@ A manual time tracker for people who just want to press play, work, and press st
   This installs `chronos` and `chronos-cli` via pacman, with a proper `.desktop` entry and icons. Once AUR registration reopens we'll publish it there too.
 
   Always get the `PKGBUILD` this way (a fresh clone of `master`), not from inside a downloaded release archive/zip — packaging fixes ship as plain commits to `packaging/aur/` without a new app release, so a `PKGBUILD` frozen inside an old release's source archive can be missing them.
-- **Other Linux / Windows**: grab an installer from the [latest release](https://github.com/RickCaleg/chronos/releases/latest) (`.deb`, `.rpm`, `.AppImage`, or `.msi`/`.exe`).
+- **Other Linux (AppImage)**: `packaging/appimage/install.sh` downloads the AppImage, gives it a `.desktop` entry + icon so it shows up in your app launcher, and is the only Linux build the in-app updater can actually self-update (`.deb`/`.rpm`/AUR installs can't — see [Auto-updates](#auto-updates)):
+  ```sh
+  curl -fsSL https://raw.githubusercontent.com/RickCaleg/chronos/master/packaging/appimage/install.sh | bash
+  ```
+  Review the script before piping it to a shell, as always — or clone the repo and run `packaging/appimage/install.sh` directly. Pass a version to install something other than the latest (`install.sh 0.5.0`); safe to re-run to reinstall/update.
+- **Other Linux (.deb/.rpm) / Windows**: grab an installer from the [latest release](https://github.com/RickCaleg/chronos/releases/latest) (`.deb`, `.rpm`, or `.msi`/`.exe`).
 
 ## Getting started
 
@@ -91,6 +96,8 @@ The workflow also signs the build (using the `TAURI_SIGNING_PRIVATE_KEY`/`TAURI_
 ## Auto-updates
 
 Chronos checks `github.com/RickCaleg/chronos/releases/latest` on launch and whenever you click **Check for updates** in Settings. Updates are downloaded and verified against a public key baked into the app before being installed — see [CONTRIBUTING.md](CONTRIBUTING.md#releasing) if you're maintaining a fork and need to re-key this.
+
+**On Linux, self-updating only works for the AppImage build** (`packaging/appimage/install.sh`) — Tauri's updater has no way to replace a `.deb`/`.rpm`/AUR-installed binary in place, since there's no single file it can overwrite the way an AppImage lets it. On those installs, Settings shows a link to the releases page instead of a broken "Download and install" button. Windows and macOS aren't affected.
 
 ## Data & backups
 
