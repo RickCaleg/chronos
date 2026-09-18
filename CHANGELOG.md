@@ -4,11 +4,15 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.5.1] - 2026-09-18
 ### Added
 - `packaging/appimage/install.sh` — downloads the AppImage, sets up a `.desktop` entry + icon so it shows up in your app launcher. See the README's Installing section.
+### Changed
+- ProofHub task-level linking is now per-entry (via each entry's own `#task-number`) instead of one fixed task per project mapping, and the "create a timesheet" convenience button was removed.
 ### Fixed
 - In-app updates failing with a confusing "Failed to install package" on Linux installs other than the AppImage (.deb/.rpm/AUR) — self-update only works for AppImage; other installs now get a link to the releases page instead.
-- The AppImage build crashing on launch (blank window) with "Could not create default EGL display: EGL_BAD_PARAMETER" on hosts with a newer Mesa than what linuxdeploy bundled — a few over-bundled system libraries are now stripped and the AppImage re-signed as part of the release build.
+- The AppImage crashing on launch (blank window) with "Could not create default EGL display: EGL_BAD_PARAMETER" on hosts with a newer Mesa than what linuxdeploy bundled — a few over-bundled system libraries are now stripped and the AppImage re-signed as part of the release build.
 
 ## [0.5.0] - 2026-09-17
 ### Added
