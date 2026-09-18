@@ -258,6 +258,8 @@ pub fn run() {
             proofhub_plugin::proofhub_plugin_uninstall,
             proofhub_plugin::proofhub_plugin_call,
             proofhub_plugin::proofhub_test_connection,
+            proofhub_plugin::proofhub_read_debug_log,
+            proofhub_plugin::proofhub_clear_debug_log,
             proofhub_credentials::proofhub_save_credentials,
             proofhub_credentials::proofhub_connection_status,
             proofhub_credentials::proofhub_clear_credentials,

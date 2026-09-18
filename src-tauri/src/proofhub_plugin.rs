@@ -56,6 +56,16 @@ fn version_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(plugin_dir(app)?.join("VERSION"))
 }
 
+/// Where the plugin binary writes its most recent request/response —
+/// overwritten every call, not appended, so it's always "what just
+/// happened." Exists specifically because a real bug report ("the push
+/// succeeded but the task link didn't happen") turned out to be
+/// undiagnosable without seeing the actual request ProofHub received and
+/// what it echoed back.
+fn debug_log_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(plugin_dir(app)?.join("debug.log"))
+}
+
 #[derive(Serialize)]
 pub struct PluginStatus {
     installed: bool,
@@ -139,6 +149,20 @@ pub fn proofhub_plugin_uninstall(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Reads the plugin's last request/response (see `debug_log_path`) for the
+/// "Debug log" disclosure in the ProofHub tab. Empty string if nothing's
+/// been logged yet (e.g. before the first call this session).
+#[tauri::command]
+pub fn proofhub_read_debug_log(app: AppHandle) -> Result<String, String> {
+    Ok(std::fs::read_to_string(debug_log_path(&app)?).unwrap_or_default())
+}
+
+#[tauri::command]
+pub fn proofhub_clear_debug_log(app: AppHandle) -> Result<(), String> {
+    let _ = std::fs::remove_file(debug_log_path(&app)?);
+    Ok(())
+}
+
 /// The single generic bridge every ProofHub-aware UI action goes through,
 /// using the currently *saved* credentials. `action`/`payload` describe the
 /// request (see proofhub-plugin/src/main.rs for the exact shapes);
@@ -183,6 +207,7 @@ fn run_plugin(
 
     let mut command = Command::new(&path);
     command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
+    command.env("CHRONOS_PROOFHUB_LOG_PATH", debug_log_path(app)?);
 
     // Without this, every spawn flashes a visible console window on Windows
     // — chronos-proofhub-plugin is a console-subsystem binary, and Windows

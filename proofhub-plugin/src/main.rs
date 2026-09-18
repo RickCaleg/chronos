@@ -17,7 +17,7 @@ use reqwest::blocking::{Client, Response};
 use reqwest::StatusCode;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::io::Read;
+use std::io::{Read, Write};
 
 const USER_AGENT: &str = "Chronos (richardson.saconi@outlook.com)";
 
@@ -114,7 +114,40 @@ fn main() {
         )))),
     };
 
-    finish(dispatch(&client, request));
+    let result = dispatch(&client, request);
+    log_debug(&input, &result);
+    finish(result);
+}
+
+/// Troubleshooting aid for exactly the kind of bug that motivated it: a
+/// push "succeeding" but silently not doing what the request asked for
+/// (e.g. logging at the project level instead of a specific task). Only
+/// writes anything if the main app set `CHRONOS_PROOFHUB_LOG_PATH` when it
+/// spawned this process (it always does — see `run_plugin` in
+/// src-tauri/src/proofhub_plugin.rs); overwrites the file each call rather
+/// than appending, so it's always "what just happened," not an
+/// ever-growing history. The API key is redacted before anything touches
+/// disk.
+fn log_debug(raw_input: &str, result: &Result<Value, PluginError>) {
+    let Ok(log_path) = std::env::var("CHRONOS_PROOFHUB_LOG_PATH") else {
+        return;
+    };
+
+    let mut request_for_log: Value = serde_json::from_str(raw_input).unwrap_or(Value::Null);
+    if let Some(obj) = request_for_log.as_object_mut() {
+        obj.insert("apiKey".to_string(), Value::String("<redacted>".to_string()));
+    }
+
+    let response_for_log = match result {
+        Ok(data) => json!({ "ok": true, "data": data }),
+        Err(err) => json!({ "ok": false, "error": { "status": err.status, "message": err.message } }),
+    };
+
+    let line = json!({ "request": request_for_log, "response": response_for_log });
+    let pretty = serde_json::to_string_pretty(&line).unwrap_or_else(|_| line.to_string());
+    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).write(true).truncate(true).open(&log_path) {
+        let _ = writeln!(file, "{pretty}");
+    }
 }
 
 /// Prints the JSON envelope and exits — the single point where the process
@@ -204,7 +237,14 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
                     task_id.as_deref(),
                 ),
             )?;
-            Ok(json!({ "id": stringify_id(body.get("id")) }))
+            // The full response (not just `id`) so the debug log can show
+            // exactly what ProofHub echoed back for list_id/task_id — the
+            // frontend only reads `.id` off this, extra fields are harmless.
+            let mut result = json!({ "id": stringify_id(body.get("id")) });
+            if let Some(obj) = result.as_object_mut() {
+                obj.insert("raw".to_string(), body);
+            }
+            Ok(result)
         }
         Request::UpdateEntry {
             subdomain,
@@ -220,7 +260,7 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
             list_id,
             task_id,
         } => {
-            put(
+            let body = put(
                 client,
                 &subdomain,
                 &api_key,
@@ -237,7 +277,7 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
                     task_id.as_deref(),
                 ),
             )?;
-            Ok(Value::Null)
+            Ok(body)
         }
     }
 }
@@ -322,7 +362,19 @@ fn handle_response(response: Response) -> Result<Value, PluginError> {
     let text = response.text().unwrap_or_default();
     let body: Value = serde_json::from_str(&text).unwrap_or(Value::Null);
 
-    if status.is_success() {
+    // Confirmed via CHRONOS_PROOFHUB_LOG_PATH debug logging: ProofHub signals
+    // at least some failures (e.g. a bad API key) with an HTTP 200 and
+    // `{"success": false, "status": false, "message": "..."}` in the body,
+    // not a non-2xx status code — an HTTP-level success is necessary but
+    // not sufficient. This is also the leading suspect for the
+    // "push succeeded but the task link silently didn't happen" report: a
+    // rejected/invalid task_id could plausibly come back the same way,
+    // previously treated as a full success because only `status.is_success()`
+    // was checked.
+    let body_says_failure = body.get("success").and_then(Value::as_bool) == Some(false)
+        || body.get("status").and_then(Value::as_bool) == Some(false);
+
+    if status.is_success() && !body_says_failure {
         return Ok(body);
     }
 

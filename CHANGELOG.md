@@ -6,8 +6,10 @@ All notable changes to Chronos are documented here. Format loosely follows
 ## [Unreleased]
 ### Added
 - Optional "group pushes by day": sums same-task/description/project entries into one ProofHub push instead of one per Chronos entry.
+- A "Debug log" in the ProofHub tab showing the exact request/response of the last ProofHub call, for diagnosing pushes that don't behave as expected.
 ### Fixed
 - Task-level linking was silently dropped on every re-push ("out of sync" retry) — the plugin's update-entry action never actually read the task/list id fields the app was already sending.
+- ProofHub responses that fail with an HTTP 200 and `success: false` in the body (confirmed for a bad API key, suspected for rejected task links) were being treated as successful pushes.
 
 ## [0.5.2] - 2026-09-18
 ### Changed

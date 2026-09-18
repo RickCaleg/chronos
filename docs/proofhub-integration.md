@@ -500,6 +500,32 @@ control." Revisit only if real usage shows people want it.
 | Network failure (offline, DNS, timeout) | Treat as retryable; never mark an entry synced on ambiguous failure — a false "unsynced" costs a re-click, a false "synced" is a silently missing hour in ProofHub. |
 | ProofHub returns success but the local DB write fails right after | Log distinctly so "never sent" and "sent but not recorded locally" aren't confused — don't let a retry double-log the hours. |
 
+**Fixed bug (found via the debug log, §9.1):** `handle_response` only ever
+checked the HTTP status code. ProofHub signals at least some failures (a
+bad API key, confirmed) with an HTTP **200** and `{"success": false,
+"status": false, "message": "..."}` in the body, not a non-2xx status —
+meaning those responses were silently treated as full successes. This is
+the leading suspect for "the push worked but the task link didn't happen"
+reports: a rejected/invalid `task_id` plausibly comes back the same way.
+Fixed by also checking `body.success`/`body.status` for an explicit
+`false` before treating a response as `Ok`.
+
+### 9.1 The debug log
+
+`chronos-proofhub-plugin` writes the exact request it received (API key
+redacted) and the exact response envelope it produced to a file the main
+app tells it about via `CHRONOS_PROOFHUB_LOG_PATH` (set in
+`run_plugin`, `src-tauri/src/proofhub_plugin.rs`) — overwritten every call,
+not appended, so it's always "what just happened." Exposed in the ProofHub
+tab as a collapsed "Debug log" disclosure (`proofhub_read_debug_log`/
+`proofhub_clear_debug_log` commands) with copy/clear buttons. Exists
+specifically because the bug above was undiagnosable blind — the plugin's
+own stderr is discarded (§3.2) and nothing was previously logged anywhere.
+`push-entry`/`update-entry` also now return ProofHub's full raw response
+body (not just the extracted `id`), so the log shows exactly what ProofHub
+echoed back for `list_id`/`task_id`, not just whether the call nominally
+succeeded.
+
 ## 10. Architecture / file layout
 
 - **`proofhub-plugin/`** (new Cargo workspace member) — `src/main.rs`,

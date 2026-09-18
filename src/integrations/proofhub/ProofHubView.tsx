@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { invoke } from "@tauri-apps/api/core";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Check, ChevronRight, Loader2, RefreshCw } from "lucide-react";
 import { useProofHubStore, type RemoteItem } from "./useProofHubStore";
 import { useProjectsStore } from "../../store/useProjectsStore";
@@ -29,6 +31,9 @@ export function ProofHubView() {
   const [connectError, setConnectError] = useState<string | null>(null);
   const [projectsError, setProjectsError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [debugLogOpen, setDebugLogOpen] = useState(false);
+  const [debugLog, setDebugLog] = useState("");
+  const [debugCopied, setDebugCopied] = useState(false);
 
   useEffect(() => {
     if (proofhub.subdomain && !proofhub.remoteProjects) {
@@ -57,6 +62,25 @@ export function ProofHubView() {
     } finally {
       setRefreshing(false);
     }
+  };
+
+  const handleToggleDebugLog = async () => {
+    const opening = !debugLogOpen;
+    setDebugLogOpen(opening);
+    if (opening) {
+      setDebugLog(await invoke<string>("proofhub_read_debug_log"));
+    }
+  };
+
+  const handleCopyDebugLog = async () => {
+    await writeText(debugLog);
+    setDebugCopied(true);
+    setTimeout(() => setDebugCopied(false), 1500);
+  };
+
+  const handleClearDebugLog = async () => {
+    await invoke("proofhub_clear_debug_log");
+    setDebugLog("");
   };
 
   return (
@@ -144,6 +168,35 @@ export function ProofHubView() {
               )}
             </div>
           )}
+
+          <div className="border-t border-[var(--color-border)] pt-3">
+            <button
+              type="button"
+              onClick={handleToggleDebugLog}
+              className="flex items-center gap-1 text-xs text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
+            >
+              <ChevronRight size={12} className={cn("transition-transform", debugLogOpen && "rotate-90")} />
+              {t("proofhub.debugLog")}
+            </button>
+
+            {debugLogOpen && (
+              <div className="mt-2 space-y-2">
+                <p className="text-xs text-[var(--color-text-muted)]">{t("proofhub.debugLogHint")}</p>
+                <pre className="max-h-64 overflow-auto rounded-[2px] border border-[var(--color-border)] bg-[var(--color-bg)] p-2 text-[11px] whitespace-pre-wrap break-all text-[var(--color-text-muted)]">
+                  {debugLog || t("proofhub.debugLogEmpty")}
+                </pre>
+                <div className="flex gap-2">
+                  <Button variant="secondary" size="sm" onClick={handleCopyDebugLog} disabled={!debugLog}>
+                    {debugCopied ? <Check size={13} /> : null}
+                    {t("proofhub.debugLogCopy")}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={handleClearDebugLog} disabled={!debugLog}>
+                    {t("proofhub.debugLogClear")}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
