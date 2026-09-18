@@ -687,7 +687,7 @@ dependencies = [
 
 [[package]]
 name = "chronos"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "aes-gcm",
  "libsqlite3-sys",
@@ -711,7 +711,7 @@ dependencies = [
 
 [[package]]
 name = "chronos-cli"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -727,7 +727,7 @@ dependencies = [
 
 [[package]]
 name = "chronos-proofhub-plugin"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "reqwest 0.12.28",
  "serde",
