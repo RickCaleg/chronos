@@ -78,8 +78,8 @@ jobs:
       - name: Stage and sign the ProofHub plugin binary
         shell: bash
         env:
-          PLUGIN_SIGNING_PRIVATE_KEY: ${{ secrets.PLUGIN_SIGNING_PRIVATE_KEY }}
-          PLUGIN_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.PLUGIN_SIGNING_PRIVATE_KEY_PASSWORD }}
+          SIGNING_PRIVATE_KEY: ${{ secrets.PLUGIN_SIGNING_PRIVATE_KEY }}
+          SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.PLUGIN_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           mkdir -p dist-plugin
           if [ "${{ matrix.platform }}" = "windows-latest" ]; then
@@ -91,9 +91,9 @@ jobs:
           fi
           # rsign/minisign only take the decryption password via an
           # interactive TTY prompt, which this runner doesn't have — see
-          # xtask/src/sign_plugin.rs for why this uses the minisign crate
+          # xtask/src/sign_file.rs for why this uses the minisign crate
           # directly instead of a CLI.
-          cargo run --release -p xtask --bin sign-plugin -- "$asset" "$asset.minisig"
+          cargo run --release -p xtask --bin sign-file -- "$asset" "$asset.minisig"
 
       - uses: tauri-apps/tauri-action@v0
         env:
@@ -112,3 +112,32 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: gh release upload "${{ github.ref_name }}" dist-cli/* dist-plugin/* --clobber --repo "${{ github.repository }}"
+
+      # linuxdeploy bundles a few host libraries (libwayland-client,
+      # libxcb-render/-shm, libxkbcommon) that its own excludelist doesn't
+      # cover — on a host with a newer Mesa than whatever built those
+      # bundled copies, the mismatch crashes WebKitWebProcess with "Could
+      # not create default EGL display: EGL_BAD_PARAMETER" the moment the
+      # window tries to render (window opens, stays blank). See
+      # packaging/appimage/strip-bundled-libs.sh and CHANGELOG.md.
+      #
+      # tauri-action already built + signed + uploaded the (broken)
+      # AppImage above; this fixes it in place and re-signs it, since the
+      # embedded latest.json signature has to match the new bytes exactly
+      # or every install's self-updater rejects the file.
+      - name: Fix the AppImage's over-bundled libraries and re-sign it
+        if: matrix.platform == 'ubuntu-latest'
+        shell: bash
+        env:
+          SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          appimage="$(find target/release/bundle/appimage -maxdepth 1 -name '*.AppImage' | head -1)"
+          packaging/appimage/strip-bundled-libs.sh "$appimage"
+          cargo run --release -p xtask --bin sign-file -- "$appimage" "$appimage.sig"
+
+          gh release download "${{ github.ref_name }}" -p latest.json -O latest.json --clobber --repo "${{ github.repository }}"
+          python3 packaging/appimage/patch-latest-json.py latest.json "$(base64 -w0 "$appimage.sig")"
+
+          gh release upload "${{ github.ref_name }}" "$appimage" "$appimage.sig" latest.json --clobber --repo "${{ github.repository }}"

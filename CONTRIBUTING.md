@@ -28,7 +28,7 @@ See the [README](README.md#publishing-a-release) for the day-to-day `git tag` st
 
 If the private key is ever lost, generate a new pair, update the repo secrets and the `pubkey` in `tauri.conf.json`, and know that every previously-installed copy of Chronos will stop being able to verify new releases — they'd need a fresh manual install to pick up the new key.
 
-The ProofHub plugin binary is signed with a **separate** keypair (`PLUGIN_SIGNING_PRIVATE_KEY` / `PLUGIN_SIGNING_PRIVATE_KEY_PASSWORD` repo secrets, public half embedded in `src-tauri/src/proofhub_plugin.rs`) so a compromise of one key can't be used against the other. Signing itself happens via `xtask/src/sign_plugin.rs` rather than the `rsign`/`minisign` CLIs, since those only accept the decryption password through an interactive TTY prompt, which CI doesn't have. See `docs/proofhub-integration.md` section 3.4 for the full rationale.
+The ProofHub plugin binary is signed with a **separate** keypair (`PLUGIN_SIGNING_PRIVATE_KEY` / `PLUGIN_SIGNING_PRIVATE_KEY_PASSWORD` repo secrets, public half embedded in `src-tauri/src/proofhub_plugin.rs`) so a compromise of one key can't be used against the other. Signing itself happens via `xtask/src/sign_file.rs` (a generic minisign signer, also used to re-sign the AppImage after `packaging/appimage/strip-bundled-libs.sh` patches it) rather than the `rsign`/`minisign` CLIs, since those only accept the decryption password through an interactive TTY prompt, which CI doesn't have. See `docs/proofhub-integration.md` section 3.4 for the full rationale.
 
 ## Reporting bugs / suggesting features
 

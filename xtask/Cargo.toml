@@ -1,13 +1,13 @@
 [package]
 name = "xtask"
 version = "0.0.0"
-description = "CI-only helper (not shipped): non-interactively signs the ProofHub plugin binaries with the dedicated minisign keypair, since the `rsign`/`minisign` CLIs only accept the signing password via an interactive TTY prompt."
+description = "CI-only helpers (not shipped): non-interactive minisign signing, since the rsign/minisign CLIs only accept the signing password via an interactive TTY prompt."
 publish = false
 edition = "2021"
 
 [[bin]]
-name = "sign-plugin"
-path = "src/sign_plugin.rs"
+name = "sign-file"
+path = "src/sign_file.rs"
 
 [dependencies]
 minisign = "0.9"

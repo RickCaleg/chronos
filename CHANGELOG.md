@@ -8,6 +8,7 @@ All notable changes to Chronos are documented here. Format loosely follows
 - `packaging/appimage/install.sh` — downloads the AppImage, sets up a `.desktop` entry + icon so it shows up in your app launcher. See the README's Installing section.
 ### Fixed
 - In-app updates failing with a confusing "Failed to install package" on Linux installs other than the AppImage (.deb/.rpm/AUR) — self-update only works for AppImage; other installs now get a link to the releases page instead.
+- The AppImage build crashing on launch (blank window) with "Could not create default EGL display: EGL_BAD_PARAMETER" on hosts with a newer Mesa than what linuxdeploy bundled — a few over-bundled system libraries are now stripped and the AppImage re-signed as part of the release build.
 
 ## [0.5.0] - 2026-09-17
 ### Added
