@@ -165,8 +165,14 @@
     "sendToProofHub": "Enviar para o ProofHub",
     "sending": "Enviando…",
     "synced": "Sincronizado com o ProofHub",
+    "outOfSync": "Editado desde a última sincronização — clique para atualizar no ProofHub",
     "sendDay": "Enviar dia para o ProofHub",
     "sendDayConfirm": "Enviar {{count}} registros ({{hours}} no total) para o ProofHub?",
-    "sendDayPartialFailure": "{{count}} registros não puderam ser enviados — confira individualmente."
+    "sendDayPartialFailure": "{{count}} registros não puderam ser enviados — confira individualmente.",
+    "linkTask": "Vincular a uma task específica (opcional)",
+    "taskLinked": "Vinculado a uma task",
+    "selectTodolist": "Lista de tasks…",
+    "selectTask": "Task…",
+    "clearTaskLink": "Remover vínculo de task"
   }
 }

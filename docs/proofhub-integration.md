@@ -1,8 +1,8 @@
 # ProofHub integration — design & implementation plan
 
-Status: **in development on `feature/proofhub-integration`, targeting
-v0.5.0.** This document is the detailed design for an optional "plugin"
-that pushes logged Chronos time entries into ProofHub projects/tasks.
+Status: **Phases 1 and 2 shipped in v0.5.0.** This document is the detailed
+design for an optional "plugin" that pushes logged Chronos time entries
+into ProofHub projects/tasks. Phase 3 (§12) remains unscheduled.
 
 ## 1. Goal and scope
 
@@ -473,10 +473,19 @@ ask), targeting v0.5.0:**
   mapping, including "create timesheet" convenience).
 - Per-entry manual push + sync badge (§8.1) + error handling (§9).
 
-**Phase 2 — batch push + task-level linking:**
-- "Send day to ProofHub" (§8.2).
-- Optional todolist+task mapping and `list_id`/`task_id` on push.
-- Re-sync flow for edited entries (§8.3).
+**Phase 2 — batch push + task-level linking. Status: done.**
+- "Send day to ProofHub" (§8.2) — shipped in Phase 1 already, ahead of
+  schedule (it was cheap to add alongside the per-entry badge).
+- Optional todolist+task mapping and `list_id`/`task_id` on push — a
+  collapsed "Link to a specific task" disclosure per project mapping row
+  (`ProjectMappingRow` in `ProofHubSettings.tsx`), collapsed by default per
+  §6's "most users will be fine at the project/timesheet level."
+- Re-sync flow for edited entries (§8.3) — the functional behavior (PUT
+  instead of POST once `proofhubTimeEntryId` exists) was already correct
+  from Phase 1's `pushEntryToProofHub`; added the missing third visual
+  state to `SyncBadge` (a distinct "out of sync" icon, `RefreshCw`, for
+  "has a ProofHub id but was edited since" — previously indistinguishable
+  from "never sent").
 
 **Phase 3 — optional hardening, only if warranted by real use:**
 - OS-keychain upgrade path for the credential (§5), opt-in.

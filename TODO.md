@@ -12,11 +12,11 @@ and simple — this is a manual time tracker, not a full Clockify clone (see
 Shipped in 0.4.0: system tray + global shortcut, start-with-system
 (minimized to tray), command palette, and tags.
 
-Shipped in 0.5.0: optional ProofHub integration (Phase 1 — install, connect,
-project/timesheet mapping, per-entry and per-day push). Phase 2/3 from
-[docs/proofhub-integration.md](docs/proofhub-integration.md) (task-level
-linking, re-sync after edits, OS-keychain credential storage) remain
-unscheduled.
+Shipped in 0.5.0: optional ProofHub integration, Phases 1 and 2 from
+[docs/proofhub-integration.md](docs/proofhub-integration.md) — install,
+connect, project/timesheet mapping, per-entry and per-day push, optional
+task-level linking, and re-sync after edits. Phase 3 (OS-keychain
+credential storage, revisiting auto-push) remains unscheduled.
 
 ## 1. Reports tab (new top-level tab)
 

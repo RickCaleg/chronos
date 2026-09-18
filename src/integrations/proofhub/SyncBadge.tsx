@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, Check, Send, Loader2 } from "lucide-react";
+import { AlertTriangle, Check, RefreshCw, Send, Loader2 } from "lucide-react";
 import type { TimeEntry } from "../../types";
 import { pushEntryToProofHub, isProofHubMappable } from "./sync";
 
@@ -63,6 +63,24 @@ export function SyncBadge({ entry }: { entry: TimeEntry }) {
       >
         <Check size={13} />
       </span>
+    );
+  }
+
+  // Was pushed before (has a ProofHub id) but edited since, so
+  // proofhub_synced_at was cleared — distinct from never having been sent
+  // at all. Clicking still works: pushEntryToProofHub sees
+  // proofhubTimeEntryId and does an update instead of creating a duplicate.
+  if (entry.proofhubTimeEntryId) {
+    return (
+      <button
+        type="button"
+        onClick={handlePush}
+        className={iconButtonClass}
+        aria-label={t("proofhub.outOfSync")}
+        title={t("proofhub.outOfSync")}
+      >
+        <RefreshCw size={13} />
+      </button>
     );
   }
 

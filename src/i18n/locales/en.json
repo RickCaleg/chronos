@@ -165,8 +165,14 @@
     "sendToProofHub": "Send to ProofHub",
     "sending": "Sending…",
     "synced": "Synced to ProofHub",
+    "outOfSync": "Edited since last sync — click to update on ProofHub",
     "sendDay": "Send day to ProofHub",
     "sendDayConfirm": "Send {{count}} entries ({{hours}} total) to ProofHub?",
-    "sendDayPartialFailure": "{{count}} entries couldn't be sent — check them individually."
+    "sendDayPartialFailure": "{{count}} entries couldn't be sent — check them individually.",
+    "linkTask": "Link to a specific task (optional)",
+    "taskLinked": "Linked to a task",
+    "selectTodolist": "Task list…",
+    "selectTask": "Task…",
+    "clearTaskLink": "Remove task link"
   }
 }
