@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Download, FileSpreadsheet, FolderOpen, RefreshCw, Save, Trash2, Upload } from "lucide-react";
 import { confirm, open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -26,6 +26,13 @@ import {
 import { performAutoBackup } from "../../lib/autoBackup";
 import { formatDayLabel, formatTimeShort } from "../../lib/time";
 import { cn } from "../../lib/cn";
+
+// Lazy-loaded so its code (and the ProofHub-specific labels/logic inside
+// it) isn't on the JS execution path for a user who never opens this
+// section — see docs/proofhub-integration.md section 6.
+const ProofHubSettings = lazy(() =>
+  import("../../integrations/proofhub/ProofHubSettings").then((m) => ({ default: m.ProofHubSettings })),
+);
 
 const AUTO_BACKUP_INTERVAL_OPTIONS: { hours: number; labelKey: string }[] = [
   { hours: 1, labelKey: "settings.autoBackupHourly" },
@@ -224,6 +231,10 @@ export function SettingsView() {
           {shortcutStatus && <p className="mt-2 text-sm">{shortcutStatus}</p>}
         </div>
       </section>
+
+      <Suspense fallback={null}>
+        <ProofHubSettings />
+      </Suspense>
 
       <section className="mb-6 rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
         <h2 className="mb-3 text-sm font-medium">{t("settings.display")}</h2>

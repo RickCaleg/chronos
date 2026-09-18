@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Loader2, Send } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { confirm } from "@tauri-apps/plugin-dialog";
 import type { Project, TimeEntry } from "../../types";
 import type { EntryOrGroup } from "../../lib/grouping";
 import { EntryRow } from "./EntryRow";
@@ -9,6 +10,7 @@ import { GroupedEntryRow } from "./GroupedEntryRow";
 import { useProjectsStore } from "../../store/useProjectsStore";
 import { useLiveElapsed } from "../../hooks/useLiveElapsed";
 import { formatDateShort, formatDayLabel, formatDurationHuman } from "../../lib/time";
+import { isProofHubMappable, pushEntryToProofHub } from "../../integrations/proofhub/sync";
 import i18n from "../../i18n";
 
 interface DayGroupProps {
@@ -38,6 +40,8 @@ export function DayGroup({ dayKey, label, items, runningEntry }: DayGroupProps) 
   const { t } = useTranslation();
   const { projects } = useProjectsStore();
   const [copied, setCopied] = useState(false);
+  const [sendingDay, setSendingDay] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const runningElapsed = useLiveElapsed(runningEntry?.startTime);
   const total =
     items.reduce((sum, item) => {
@@ -46,6 +50,30 @@ export function DayGroup({ dayKey, label, items, runningEntry }: DayGroupProps) 
     }, 0) + runningElapsed;
   const referenceEntry = items[0] ? firstEntry(items[0]) : runningEntry ?? null;
   const title = label ? t(`records.${label}`) : referenceEntry ? formatDayLabel(referenceEntry.startTime, i18n.language) : "";
+
+  const allEntries = items.flatMap((item) => (Array.isArray(item) ? item : [item]));
+  const pushable = allEntries.filter((e) => !e.proofhubSyncedAt && isProofHubMappable(e));
+
+  async function handleSendDay() {
+    const hours = formatDurationHuman(pushable.reduce((s, e) => s + (e.durationSeconds ?? 0), 0));
+    const ok = await confirm(t("proofhub.sendDayConfirm", { count: pushable.length, hours }));
+    if (!ok) return;
+
+    setSendingDay(true);
+    setSendError(null);
+    let failures = 0;
+    for (const entry of pushable) {
+      try {
+        await pushEntryToProofHub(entry);
+        // A gentle pace under ProofHub's 25-requests/10s limit (docs/proofhub-integration.md section 2.3).
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      } catch {
+        failures++;
+      }
+    }
+    setSendingDay(false);
+    if (failures > 0) setSendError(t("proofhub.sendDayPartialFailure", { count: failures }));
+  }
 
   async function handleCopyDay() {
     const lines = items.map((item) => {
@@ -75,11 +103,24 @@ export function DayGroup({ dayKey, label, items, runningEntry }: DayGroupProps) 
           >
             {copied ? <Check size={12} className="text-[var(--color-accent)]" /> : <Copy size={12} />}
           </button>
+          {pushable.length > 0 && (
+            <button
+              type="button"
+              onClick={handleSendDay}
+              disabled={sendingDay}
+              aria-label={t("proofhub.sendDay")}
+              title={t("proofhub.sendDay")}
+              className="rounded-[2px] p-1 text-[var(--color-text-muted)] opacity-0 outline-none transition-opacity hover:bg-[var(--color-border)] focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)] group-hover:opacity-100"
+            >
+              {sendingDay ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+            </button>
+          )}
         </span>
         <span>
           {t("records.total")}: {formatDurationHuman(total)}
         </span>
       </div>
+      {sendError && <p className="px-3 pb-1 text-xs text-[var(--color-danger)]">{sendError}</p>}
       <div className="rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)]" key={dayKey}>
         {items.map((item, i) => (
           <div key={itemKey(item)} className={i > 0 ? "border-t border-[var(--color-border)]" : ""}>

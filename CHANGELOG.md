@@ -5,6 +5,11 @@ All notable changes to Chronos are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-17
+### Added
+- Optional ProofHub integration: install a signed companion plugin from Settings to push logged hours into ProofHub projects/timesheets. Off and invisible until installed — see `docs/proofhub-integration.md`.
+- Per-entry "send to ProofHub" and a "send day" batch action once a project is mapped.
+
 ## [0.4.0] - 2026-09-17
 ### Added
 - Optional automatic backups to a folder of your choice, with a configurable schedule and retention count.

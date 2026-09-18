@@ -12,6 +12,12 @@ and simple — this is a manual time tracker, not a full Clockify clone (see
 Shipped in 0.4.0: system tray + global shortcut, start-with-system
 (minimized to tray), command palette, and tags.
 
+Shipped in 0.5.0: optional ProofHub integration (Phase 1 — install, connect,
+project/timesheet mapping, per-entry and per-day push). Phase 2/3 from
+[docs/proofhub-integration.md](docs/proofhub-integration.md) (task-level
+linking, re-sync after edits, OS-keychain credential storage) remain
+unscheduled.
+
 ## 1. Reports tab (new top-level tab)
 
 A new "Reports" entry in the top nav (alongside Timer/Projects/Settings):
@@ -38,11 +44,3 @@ to their start/end time) for reviewing a week at a glance.
 - The most expensive UI to build on this list — custom layout, not a
   reusable pattern from elsewhere in the app.
 - See open question under #1 about where this lives in the nav.
-
-## 4. ProofHub integration (optional, planned)
-
-Push logged Chronos time entries into ProofHub projects/tasks. Full design
-— API research, data model, credential storage, settings UX, phased
-rollout — is written up in
-[docs/proofhub-integration.md](docs/proofhub-integration.md). Not yet
-scheduled into a release; planning-only until that changes.

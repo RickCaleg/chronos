@@ -9,6 +9,7 @@ import { useEntriesStore } from "../../store/useEntriesStore";
 import { EntryEditPopover } from "./EntryEditPopover";
 import { formatDurationHuman, formatTimeShort, nowIso } from "../../lib/time";
 import { projectLabel } from "../../lib/projectLabel";
+import { SyncBadge } from "../../integrations/proofhub/SyncBadge";
 import i18n from "../../i18n";
 
 const iconButtonClass =
@@ -107,6 +108,8 @@ export function EntryRow({ entry }: { entry: TimeEntry }) {
           </span>
         </span>
       </button>
+
+      <SyncBadge entry={entry} />
 
       <button
         type="button"

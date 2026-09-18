@@ -168,6 +168,8 @@ export async function importEntriesCsv(): Promise<{ imported: number }> {
       createdAt: now,
       updatedAt: now,
       tags: [],
+      proofhubTimeEntryId: null,
+      proofhubSyncedAt: null,
     });
     imported++;
   }
@@ -269,6 +271,8 @@ export async function importClockifyCsv(): Promise<{ imported: number }> {
       createdAt: now,
       updatedAt: now,
       tags: [],
+      proofhubTimeEntryId: null,
+      proofhubSyncedAt: null,
     });
     imported++;
   }

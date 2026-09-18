@@ -142,5 +142,31 @@
     "cancel": "Cancel",
     "confirm": "Confirm",
     "close": "Close"
+  },
+  "proofhub": {
+    "title": "ProofHub",
+    "description": "Send logged hours to ProofHub projects and tasks. Nothing related to this is downloaded or contacted until you install it.",
+    "install": "Install",
+    "uninstall": "Uninstall",
+    "subdomain": "ProofHub subdomain",
+    "apiKey": "API key",
+    "apiKeyHint": "In ProofHub: profile icon (bottom-left) → API access.",
+    "apiKeyPlaceholder": "Paste your ProofHub API key",
+    "connect": "Test & connect",
+    "connectedTo": "Connected to {{subdomain}}.proofhub.com",
+    "disconnect": "Disconnect",
+    "noProjects": "No active projects to map yet.",
+    "selectProject": "ProofHub project…",
+    "selectTimesheet": "Timesheet…",
+    "createTimesheet": "Create \"Chronos time\"",
+    "defaultTimesheetTitle": "Chronos time",
+    "billableByDefault": "Billable by default",
+    "unmap": "Unmap",
+    "sendToProofHub": "Send to ProofHub",
+    "sending": "Sending…",
+    "synced": "Synced to ProofHub",
+    "sendDay": "Send day to ProofHub",
+    "sendDayConfirm": "Send {{count}} entries ({{hours}} total) to ProofHub?",
+    "sendDayPartialFailure": "{{count}} entries couldn't be sent — check them individually."
   }
 }
