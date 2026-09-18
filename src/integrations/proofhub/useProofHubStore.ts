@@ -8,14 +8,10 @@ export interface RemoteItem {
   title: string;
 }
 
-/**
- * A ProofHub task has two distinct identifiers: `ticket` (the small,
- * sequential "#1234"-style number the UI shows and users actually see/type)
- * and `id` (a large opaque internal id the API needs for `task_id`). See
- * sync.ts's `resolveTaskId` for the lookup from one to the other.
- */
-export interface RemoteTask extends RemoteItem {
-  ticket: string;
+/** Where a `#ticket` lives in ProofHub — what a task-linked time entry needs. */
+export interface RemoteTask {
+  id: string;
+  listId: string;
 }
 
 interface PluginStatus {
@@ -36,16 +32,19 @@ interface ProofHubState {
   error: string | null;
 
   /**
-   * Cached results of `list-projects`/`list-timesheets`/`list-todolists` —
-   * each one spawns the plugin binary and makes a real ProofHub API call,
-   * so refetching on every mount of the settings/mapping UI was both slow
-   * and (on Windows) visibly flashed a console window per spawn. Cleared
-   * only on disconnect/uninstall or an explicit refresh.
+   * Cached results of `list-projects`/`list-timesheets` and resolved
+   * tickets — each lookup spawns the plugin binary and makes real ProofHub
+   * API calls, so refetching every time was slow. Cleared only on
+   * disconnect/uninstall or an explicit refresh. Tickets are cached only
+   * once found, so a task created in ProofHub later is still picked up.
    */
   remoteProjects: RemoteItem[] | null;
   timesheetsByProject: Record<string, RemoteItem[]>;
-  todolistsByProject: Record<string, RemoteItem[]>;
-  tasksByTodolist: Record<string, RemoteTask[]>;
+  tasksByTicket: Record<string, RemoteTask>;
+
+  /** Per Chronos entry id: currently being sent, and the last send's error (cleared on success). */
+  sending: Record<string, boolean>;
+  sendErrors: Record<string, string>;
 
   load: () => Promise<void>;
   install: () => Promise<void>;
@@ -59,8 +58,8 @@ interface ProofHubState {
 
   loadRemoteProjects: (force?: boolean) => Promise<RemoteItem[]>;
   loadTimesheets: (proofhubProjectId: string, force?: boolean) => Promise<RemoteItem[]>;
-  loadTodolists: (proofhubProjectId: string, force?: boolean) => Promise<RemoteItem[]>;
-  loadTasks: (proofhubProjectId: string, todolistId: string, force?: boolean) => Promise<RemoteTask[]>;
+  findTask: (proofhubProjectId: string, ticket: string) => Promise<RemoteTask | null>;
+  setSendState: (entryIds: string[], sending: boolean, error?: string | null) => void;
 }
 
 export const useProofHubStore = create<ProofHubState>((set, get) => ({
@@ -74,8 +73,9 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
   error: null,
   remoteProjects: null,
   timesheetsByProject: {},
-  todolistsByProject: {},
-  tasksByTodolist: {},
+  tasksByTicket: {},
+  sending: {},
+  sendErrors: {},
 
   load: async () => {
     const [status, subdomain, projectMap, groupPushesByDay] = await Promise.all([
@@ -111,7 +111,7 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
     set({ busy: true, error: null });
     try {
       await invoke("proofhub_plugin_uninstall");
-      set({ remoteProjects: null, timesheetsByProject: {}, todolistsByProject: {}, tasksByTodolist: {} });
+      set({ remoteProjects: null, timesheetsByProject: {}, tasksByTicket: {} });
       await get().load();
     } finally {
       set({ busy: false });
@@ -136,7 +136,7 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
 
   disconnect: async () => {
     await invoke("proofhub_clear_credentials");
-    set({ remoteProjects: null, timesheetsByProject: {}, todolistsByProject: {}, tasksByTodolist: {} });
+    set({ remoteProjects: null, timesheetsByProject: {}, tasksByTicket: {} });
     await get().load();
   },
 
@@ -173,19 +173,26 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
     return timesheets;
   },
 
-  loadTodolists: async (proofhubProjectId, force = false) => {
-    const cached = get().todolistsByProject[proofhubProjectId];
-    if (cached && !force) return cached;
-    const todolists = await get().call<RemoteItem[]>("list-todolists", { projectId: proofhubProjectId });
-    set((state) => ({ todolistsByProject: { ...state.todolistsByProject, [proofhubProjectId]: todolists } }));
-    return todolists;
+  findTask: async (proofhubProjectId, ticket) => {
+    const key = `${proofhubProjectId}#${ticket}`;
+    const cached = get().tasksByTicket[key];
+    if (cached) return cached;
+    const task = await get().call<RemoteTask | null>("find-task", { projectId: proofhubProjectId, ticket });
+    if (task) set((state) => ({ tasksByTicket: { ...state.tasksByTicket, [key]: task } }));
+    return task;
   },
 
-  loadTasks: async (proofhubProjectId, todolistId, force = false) => {
-    const cached = get().tasksByTodolist[todolistId];
-    if (cached && !force) return cached;
-    const tasks = await get().call<RemoteTask[]>("list-tasks", { projectId: proofhubProjectId, todolistId });
-    set((state) => ({ tasksByTodolist: { ...state.tasksByTodolist, [todolistId]: tasks } }));
-    return tasks;
+  setSendState: (entryIds, sending, error) => {
+    set((state) => {
+      const nextSending = { ...state.sending };
+      const nextErrors = { ...state.sendErrors };
+      for (const id of entryIds) {
+        if (sending) nextSending[id] = true;
+        else delete nextSending[id];
+        if (error) nextErrors[id] = error;
+        else if (error === null) delete nextErrors[id];
+      }
+      return { sending: nextSending, sendErrors: nextErrors };
+    });
   },
 }));

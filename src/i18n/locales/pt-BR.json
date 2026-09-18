@@ -176,14 +176,18 @@
     "unmap": "Remover mapeamento",
     "sendToProofHub": "Enviar para o ProofHub",
     "sending": "Enviando…",
-    "synced": "Sincronizado com o ProofHub",
-    "outOfSync": "Editado desde a última sincronização — clique para atualizar no ProofHub",
+    "synced": "Enviado ao ProofHub — clique para reenviar (ex: se foi apagado ou alterado lá)",
+    "outOfSync": "Alterado desde o envio — clique para atualizar no ProofHub",
     "sendDay": "Enviar dia para o ProofHub",
-    "sendDayConfirm": "Enviar {{count}} registros ({{hours}} no total) para o ProofHub?",
-    "sendDayPartialFailure": "{{count}} registros não puderam ser enviados — confira individualmente.",
-    "linkTask": "Vincular lançamentos pelo número da task (opcional)",
-    "taskLinked": "Vinculando lançamentos pelo número da task",
-    "taskLinkHint": "Lançamentos com número de task (ex: #1234) serão registrados nesse id de task dentro dessa lista. Sem número de task, o lançamento fica no nível de projeto/timesheet.",
-    "selectTodolist": "Lista de tasks…"
+    "sendDayConfirm": "Enviar {{count}} lançamentos ({{hours}} no total) para o ProofHub?",
+    "unitNote": "enviados juntos como um único lançamento no ProofHub: {{count}} registros, {{hours}}",
+    "resendConfirm": "Isto já está no ProofHub. Enviar de novo? O lançamento é atualizado, ou recriado se tiver sido apagado lá.",
+    "resendDay": "Reenviar dia para o ProofHub",
+    "resendDayConfirm": "Tudo deste dia já está no ProofHub. Reenviar os {{count}} lançamentos ({{hours}})? Os existentes são atualizados e os apagados, recriados.",
+    "sendDayFailure": "{{count}} não puderam ser enviados: {{message}}",
+    "linkTasks": "Lançar horas na task pelo #número",
+    "linkTasksHint": "Registros com número de task (ex: #1234) são lançados nessa task do ProofHub, em qualquer lista do projeto. Sem número, o lançamento fica no projeto.",
+    "errorUnderAMinute": "Menos de um minuto — nada para enviar.",
+    "errorTaskNotFound": "A task {{task}} não foi encontrada neste projeto do ProofHub — confira o número ou desligue o vínculo com tasks neste projeto."
   }
 }

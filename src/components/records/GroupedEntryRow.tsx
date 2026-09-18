@@ -9,6 +9,8 @@ import { EntryRow } from "./EntryRow";
 import { formatDurationHuman, nowIso } from "../../lib/time";
 import { projectLabel } from "../../lib/projectLabel";
 import { cn } from "../../lib/cn";
+import { SyncBadge } from "../../integrations/proofhub/SyncBadge";
+import { useSyncPlan } from "../../integrations/proofhub/sync";
 
 const iconButtonClass =
   "shrink-0 rounded-[2px] p-1.5 text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-border)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)]";
@@ -23,6 +25,10 @@ export function GroupedEntryRow({ entries }: { entries: TimeEntry[] }) {
   const first = entries[0];
   const project = projects.find((p) => p.id === first.projectId) ?? null;
   const total = entries.reduce((sum, e) => sum + (e.durationSeconds ?? 0), 0);
+  // When this displayed group is exactly one ProofHub unit ("group pushes
+  // by day" on), its sync button belongs on the collapsed row too.
+  const { byEntryId } = useSyncPlan();
+  const isOneUnit = byEntryId.has(first.id) && entries.every((e) => byEntryId.get(e.id) === byEntryId.get(first.id));
   const uniqueTags = Array.from(new Map(entries.flatMap((e) => e.tags).map((tag) => [tag.id, tag])).values());
 
   async function handleCopy() {
@@ -97,6 +103,8 @@ export function GroupedEntryRow({ entries }: { entries: TimeEntry[] }) {
             <span className="w-14 text-right font-mono text-sm tabular-nums">{formatDurationHuman(total)}</span>
           </span>
         </button>
+
+        {isOneUnit && <SyncBadge entry={first} />}
 
         <button
           type="button"

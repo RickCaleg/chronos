@@ -103,9 +103,19 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
   },
 
   remove: async (id) => {
+    const removed = get().entries.find((e) => e.id === id);
     await entriesDb.deleteEntry(id);
+    // A ProofHub time entry shared with other entries (a grouped push)
+    // still includes the deleted entry's time: mark the rest for resending
+    // so the total gets corrected.
+    const ref = removed?.proofhubTimeEntryId;
+    const siblings = ref ? get().entries.filter((e) => e.id !== id && e.proofhubTimeEntryId === ref && e.proofhubSyncedAt) : [];
+    for (const sibling of siblings) await entriesDb.updateEntry(sibling.id, { proofhubSyncedAt: null });
+    const siblingIds = new Set(siblings.map((e) => e.id));
     set({
-      entries: get().entries.filter((e) => e.id !== id),
+      entries: get()
+        .entries.filter((e) => e.id !== id)
+        .map((e) => (siblingIds.has(e.id) ? { ...e, proofhubSyncedAt: null } : e)),
       runningEntry: get().runningEntry?.id === id ? null : get().runningEntry,
     });
   },

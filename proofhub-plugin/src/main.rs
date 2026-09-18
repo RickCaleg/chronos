@@ -14,12 +14,15 @@
 //! ProofHub account during Phase 1 testing.
 
 use reqwest::blocking::{Client, Response};
-use reqwest::StatusCode;
+use reqwest::{Method, StatusCode};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::io::{Read, Write};
 
 const USER_AGENT: &str = "Chronos (richardson.saconi@outlook.com)";
+
+/// `/alltodo`'s maximum (and default) page size.
+const TASK_PAGE_SIZE: usize = 100;
 
 #[derive(Deserialize)]
 #[serde(tag = "action", rename_all = "kebab-case")]
@@ -34,25 +37,27 @@ enum Request {
         api_key: String,
         project_id: String,
     },
+    /// Resolves a task's `#ticket` (what users see and type) to the `id`
+    /// and list the API needs. There's no lookup-by-ticket endpoint
+    /// (ProofHub/api_v3#25), so this pages through the project's tasks.
     #[serde(rename_all = "camelCase")]
-    ListTodolists {
+    FindTask {
         subdomain: String,
         api_key: String,
         project_id: String,
+        ticket: String,
     },
+    /// Creates the time entry, or updates it in place when `time_id` is
+    /// given *and* still exists in ProofHub — a time entry deleted on the
+    /// ProofHub side is recreated instead of failing, which is what makes
+    /// "send again" work after cleaning up entries there by hand.
     #[serde(rename_all = "camelCase")]
-    ListTasks {
-        subdomain: String,
-        api_key: String,
-        project_id: String,
-        todolist_id: String,
-    },
-    #[serde(rename_all = "camelCase")]
-    PushEntry {
+    UpsertEntry {
         subdomain: String,
         api_key: String,
         project_id: String,
         timesheet_id: String,
+        time_id: Option<String>,
         logged_hours: u32,
         logged_mins: u32,
         date: String,
@@ -61,20 +66,16 @@ enum Request {
         list_id: Option<String>,
         task_id: Option<String>,
     },
+    /// Removes a time entry Chronos created earlier that no longer
+    /// represents anything (see `planDay` in src/integrations/proofhub/plan.ts).
+    /// Already-gone entries count as success.
     #[serde(rename_all = "camelCase")]
-    UpdateEntry {
+    DeleteEntry {
         subdomain: String,
         api_key: String,
         project_id: String,
         timesheet_id: String,
         time_id: String,
-        logged_hours: u32,
-        logged_mins: u32,
-        date: String,
-        status: String,
-        description: String,
-        list_id: Option<String>,
-        task_id: Option<String>,
     },
 }
 
@@ -199,77 +200,39 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
                 extract_list(&body, &["timesheets"]).into_iter().map(normalize_item).collect(),
             ))
         }
-        Request::ListTodolists {
+        Request::FindTask {
             subdomain,
             api_key,
             project_id,
+            ticket,
         } => {
-            let body = get(
-                client,
-                &subdomain,
-                &api_key,
-                &format!("/projects/{project_id}/todolists"),
-            )?;
-            Ok(Value::Array(
-                extract_list(&body, &["todolists"]).into_iter().map(normalize_item).collect(),
-            ))
-        }
-        Request::ListTasks {
-            subdomain,
-            api_key,
-            project_id,
-            todolist_id,
-        } => {
-            let body = get(
-                client,
-                &subdomain,
-                &api_key,
-                &format!("/projects/{project_id}/todolists/{todolist_id}/tasks"),
-            )?;
-            Ok(Value::Array(
-                extract_list(&body, &["tasks"]).into_iter().map(normalize_task_item).collect(),
-            ))
-        }
-        Request::PushEntry {
-            subdomain,
-            api_key,
-            project_id,
-            timesheet_id,
-            logged_hours,
-            logged_mins,
-            date,
-            status,
-            description,
-            list_id,
-            task_id,
-        } => {
-            let body = post(
-                client,
-                &subdomain,
-                &api_key,
-                &format!("/projects/{project_id}/timesheets/{timesheet_id}/time"),
-                &time_entry_body(
-                    &project_id,
-                    &timesheet_id,
-                    logged_hours,
-                    logged_mins,
-                    &date,
-                    &status,
-                    &description,
-                    list_id.as_deref(),
-                    task_id.as_deref(),
-                ),
-            )?;
-            // The full response (not just `id`) so the debug log can show
-            // exactly what ProofHub echoed back for list_id/task_id — the
-            // frontend only reads `.id` off this, extra fields are harmless.
-            let mut result = json!({ "id": stringify_id(body.get("id")) });
-            if let Some(obj) = result.as_object_mut() {
-                obj.insert("raw".to_string(), body);
+            // Open tasks first — nearly always where time is being logged,
+            // and usually a single page — then completed ones.
+            for completed in ["false", "true"] {
+                let mut start = 0;
+                loop {
+                    let body = get(
+                        client,
+                        &subdomain,
+                        &api_key,
+                        &format!("/alltodo?projects={project_id}&completed={completed}&start={start}&limit={TASK_PAGE_SIZE}"),
+                    )?;
+                    let page = extract_list(&body, &["tasks"]);
+                    if let Some(task) = page.iter().find(|t| stringify_id(t.get("ticket")) == ticket) {
+                        return Ok(json!({
+                            "id": stringify_id(task.get("id")),
+                            "listId": stringify_id(task.get("list").and_then(|l| l.get("id"))),
+                        }));
+                    }
+                    if page.len() < TASK_PAGE_SIZE {
+                        break;
+                    }
+                    start += TASK_PAGE_SIZE;
+                }
             }
-            Ok(result)
+            Ok(Value::Null)
         }
-        Request::UpdateEntry {
+        Request::UpsertEntry {
             subdomain,
             api_key,
             project_id,
@@ -283,26 +246,70 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
             list_id,
             task_id,
         } => {
-            let body = put(
-                client,
-                &subdomain,
-                &api_key,
-                &format!("/projects/{project_id}/timesheets/{timesheet_id}/time/{time_id}"),
-                &time_entry_body(
-                    &project_id,
-                    &timesheet_id,
-                    logged_hours,
-                    logged_mins,
-                    &date,
-                    &status,
-                    &description,
-                    list_id.as_deref(),
-                    task_id.as_deref(),
-                ),
-            )?;
-            Ok(body)
+            let collection = format!("/projects/{project_id}/timesheets/{timesheet_id}/time");
+            let body = time_entry_body(
+                &project_id,
+                &timesheet_id,
+                logged_hours,
+                logged_mins,
+                &date,
+                &status,
+                &description,
+                list_id.as_deref(),
+                task_id.as_deref(),
+            );
+            let existing = match time_id {
+                Some(id) if time_entry_exists(client, &subdomain, &api_key, &collection, &id)? => Some(id),
+                _ => None,
+            };
+            let (id, raw) = match existing {
+                Some(id) => {
+                    let raw = send(client, Method::PUT, &subdomain, &api_key, &format!("{collection}/{id}"), Some(&body))?;
+                    (id, raw)
+                }
+                None => {
+                    let raw = send(client, Method::POST, &subdomain, &api_key, &collection, Some(&body))?;
+                    (stringify_id(raw.get("id")), raw)
+                }
+            };
+            if id.is_empty() {
+                return Err(PluginError::internal(
+                    "ProofHub accepted the time entry but didn't return its id.".to_string(),
+                ));
+            }
+            // The full response too, so the debug log shows exactly what
+            // ProofHub echoed back for list_id/task_id.
+            Ok(json!({ "id": id, "raw": raw }))
+        }
+        Request::DeleteEntry {
+            subdomain,
+            api_key,
+            project_id,
+            timesheet_id,
+            time_id,
+        } => {
+            let collection = format!("/projects/{project_id}/timesheets/{timesheet_id}/time");
+            if time_entry_exists(client, &subdomain, &api_key, &collection, &time_id)? {
+                send(client, Method::DELETE, &subdomain, &api_key, &format!("{collection}/{time_id}"), None)?;
+            }
+            Ok(Value::Null)
         }
     }
+}
+
+/// `GET .../time/{id}` for an id that doesn't exist (e.g. deleted in
+/// ProofHub) doesn't 404 — confirmed against the real API, it returns the
+/// timesheet's whole `{"time_entries": [...]}` listing instead. So "exists"
+/// means the response is that one entry, with a matching `id`.
+fn time_entry_exists(
+    client: &Client,
+    subdomain: &str,
+    api_key: &str,
+    collection: &str,
+    time_id: &str,
+) -> Result<bool, PluginError> {
+    let body = send(client, Method::GET, subdomain, api_key, &format!("{collection}/{time_id}"), None)?;
+    Ok(stringify_id(body.get("id")) == time_id)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -338,46 +345,49 @@ fn base_url(subdomain: &str) -> String {
 }
 
 fn get(client: &Client, subdomain: &str, api_key: &str, path: &str) -> Result<Value, PluginError> {
-    let response = client
-        .get(format!("{}{}", base_url(subdomain), path))
-        .header("X-API-KEY", api_key)
-        .send()
-        .map_err(PluginError::network)?;
-    handle_response(response)
+    send(client, Method::GET, subdomain, api_key, path, None)
 }
 
-fn post(
+/// ProofHub allows 25 requests per 10 seconds per account. Rather than
+/// pacing every call up front (which made "send day" slow for the common
+/// case of a handful of entries), requests go out at full speed and a 429
+/// is waited out and retried.
+const RATE_LIMIT_RETRIES: u32 = 3;
+
+fn send(
     client: &Client,
+    method: Method,
     subdomain: &str,
     api_key: &str,
     path: &str,
-    body: &Value,
+    body: Option<&Value>,
 ) -> Result<Value, PluginError> {
-    let response = client
-        .post(format!("{}{}", base_url(subdomain), path))
-        .header("X-API-KEY", api_key)
-        .header("Content-Type", "application/json")
-        .json(body)
-        .send()
-        .map_err(PluginError::network)?;
-    handle_response(response)
-}
-
-fn put(
-    client: &Client,
-    subdomain: &str,
-    api_key: &str,
-    path: &str,
-    body: &Value,
-) -> Result<Value, PluginError> {
-    let response = client
-        .put(format!("{}{}", base_url(subdomain), path))
-        .header("X-API-KEY", api_key)
-        .header("Content-Type", "application/json")
-        .json(body)
-        .send()
-        .map_err(PluginError::network)?;
-    handle_response(response)
+    let url = format!("{}{}", base_url(subdomain), path);
+    let mut attempt = 0;
+    loop {
+        // Content-Type on every request, bodyless ones included: ProofHub
+        // rejects a DELETE without it ("INCOMPLETE HEADERS", as an HTTP 200).
+        let mut request = client
+            .request(method.clone(), &url)
+            .header("X-API-KEY", api_key)
+            .header("Content-Type", "application/json");
+        if let Some(body) = body {
+            request = request.json(body);
+        }
+        let response = request.send().map_err(PluginError::network)?;
+        if response.status() == StatusCode::TOO_MANY_REQUESTS && attempt < RATE_LIMIT_RETRIES {
+            attempt += 1;
+            let wait = response
+                .headers()
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(10);
+            std::thread::sleep(std::time::Duration::from_secs(wait.min(15)));
+            continue;
+        }
+        return handle_response(response);
+    }
 }
 
 fn handle_response(response: Response) -> Result<Value, PluginError> {
@@ -431,22 +441,6 @@ fn normalize_item(item: &Value) -> Value {
     json!({
         "id": stringify_id(item.get("id")),
         "title": item.get("title").and_then(Value::as_str).unwrap_or("").to_string(),
-    })
-}
-
-/// Tasks specifically carry a `ticket` field distinct from `id` — `ticket`
-/// is the small, sequential, "#1234"-style number ProofHub's own UI shows
-/// the user (confirmed via ProofHub's help center: sequential per account,
-/// prefixed with "#" in the UI); `id` is a large opaque internal identifier
-/// with no relation to that number, and is what the API actually needs as
-/// `task_id`. Chronos users type/see the `ticket` value, never the `id` —
-/// see sync.ts's `resolveTaskId` for where the lookup from one to the
-/// other happens.
-fn normalize_task_item(item: &Value) -> Value {
-    json!({
-        "id": stringify_id(item.get("id")),
-        "title": item.get("title").and_then(Value::as_str).unwrap_or("").to_string(),
-        "ticket": stringify_id(item.get("ticket")),
     })
 }
 

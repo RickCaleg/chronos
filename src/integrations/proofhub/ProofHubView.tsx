@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Check, ChevronRight, Loader2, RefreshCw } from "lucide-react";
 import { useProofHubStore, type RemoteItem } from "./useProofHubStore";
+import { linksTasks } from "../../db/proofhubSettings";
 import { useProjectsStore } from "../../store/useProjectsStore";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -17,7 +18,7 @@ import { cn } from "../../lib/cn";
  * own page rather than a cramped Settings section, and keeping it separate
  * from Settings means it's only ever mounted when actually in use.
  *
- * Every remote list here (projects/timesheets/todolists) is cached in
+ * Every remote list here (projects/timesheets) is cached in
  * useProofHubStore rather than refetched on mount: each fetch spawns the
  * plugin binary, and refetching every time this tab is opened was both
  * slow and, on Windows, visibly flashed a console window per spawn.
@@ -221,11 +222,6 @@ function ProjectMappingRow({
   );
   const [error, setError] = useState<string | null>(null);
 
-  const [taskLinkOpen, setTaskLinkOpen] = useState(Boolean(mapping?.todolistId));
-  const [todolists, setTodolists] = useState<RemoteItem[] | null>(
-    selectedProjectId ? proofhub.todolistsByProject[selectedProjectId] ?? null : null,
-  );
-
   useEffect(() => {
     if (!selectedProjectId) {
       setTimesheets(null);
@@ -238,15 +234,6 @@ function ProjectMappingRow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProjectId]);
 
-  useEffect(() => {
-    if (!taskLinkOpen || !selectedProjectId) return;
-    proofhub
-      .loadTodolists(selectedProjectId)
-      .then(setTodolists)
-      .catch((err) => setError(String(err)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskLinkOpen, selectedProjectId]);
-
   const applyInitialMapping = async (timesheet: RemoteItem) => {
     const proofhubProject = proofhubProjects.find((p) => p.id === selectedProjectId);
     if (!proofhubProject) return;
@@ -256,19 +243,15 @@ function ProjectMappingRow({
       timesheetId: timesheet.id,
       timesheetTitle: timesheet.title,
       defaultBillable: mapping?.defaultBillable ?? true,
-      ...(mapping?.todolistId ? { todolistId: mapping.todolistId } : {}),
+      linkTasks: mapping ? linksTasks(mapping) : false,
     });
   };
 
-  const handleSelectTodolist = (todolistId: string) => {
+  const toggleLinkTasks = async () => {
     if (!mapping) return;
-    if (todolistId) {
-      proofhub.setMapping(chronosProjectId, { ...mapping, todolistId });
-    } else {
-      const { todolistId: _drop, ...rest } = mapping;
-      void _drop;
-      proofhub.setMapping(chronosProjectId, rest);
-    }
+    const { todolistId: _legacy, ...rest } = mapping;
+    void _legacy;
+    await proofhub.setMapping(chronosProjectId, { ...rest, linkTasks: !linksTasks(mapping) });
   };
 
   const toggleBillable = async () => {
@@ -316,38 +299,18 @@ function ProjectMappingRow({
         </Select>
       </div>
       {mapping && (
-        <div className="mt-2 flex items-center gap-2">
-          <Switch checked={mapping.defaultBillable} onChange={toggleBillable} label={t("proofhub.billableByDefault")} />
-          <span className="text-xs text-[var(--color-text-muted)]">{t("proofhub.billableByDefault")}</span>
-        </div>
-      )}
-
-      {mapping && (
-        <div className="mt-2 border-t border-[var(--color-border)] pt-2">
-          <button
-            type="button"
-            onClick={() => setTaskLinkOpen((o) => !o)}
-            className="flex items-center gap-1 text-xs text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
-          >
-            <ChevronRight size={12} className={cn("transition-transform", taskLinkOpen && "rotate-90")} />
-            {mapping.todolistId ? t("proofhub.taskLinked") : t("proofhub.linkTask")}
-          </button>
-          {mapping.todolistId && (
-            <p className="mt-1 text-xs text-[var(--color-text-muted)]">{t("proofhub.taskLinkHint")}</p>
-          )}
-
-          {taskLinkOpen && (
-            <div className="mt-2">
-              <Select value={mapping.todolistId ?? ""} onChange={(e) => handleSelectTodolist(e.target.value)} disabled={!todolists}>
-                <option value="">{t("proofhub.selectTodolist")}</option>
-                {(todolists ?? []).map((tl) => (
-                  <option key={tl.id} value={tl.id}>
-                    {tl.title}
-                  </option>
-                ))}
-              </Select>
+        <div className="mt-2 space-y-2">
+          <div className="flex items-center gap-2">
+            <Switch checked={mapping.defaultBillable} onChange={toggleBillable} label={t("proofhub.billableByDefault")} />
+            <span className="text-xs text-[var(--color-text-muted)]">{t("proofhub.billableByDefault")}</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <Switch checked={linksTasks(mapping)} onChange={toggleLinkTasks} label={t("proofhub.linkTasks")} />
+            <div>
+              <p className="text-xs text-[var(--color-text-muted)]">{t("proofhub.linkTasks")}</p>
+              {linksTasks(mapping) && <p className="text-xs text-[var(--color-text-muted)]">{t("proofhub.linkTasksHint")}</p>}
             </div>
-          )}
+          </div>
         </div>
       )}
 

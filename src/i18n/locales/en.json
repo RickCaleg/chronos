@@ -176,14 +176,18 @@
     "unmap": "Unmap",
     "sendToProofHub": "Send to ProofHub",
     "sending": "Sending…",
-    "synced": "Synced to ProofHub",
-    "outOfSync": "Edited since last sync — click to update on ProofHub",
+    "synced": "Sent to ProofHub — click to send again (e.g. if it was deleted or changed there)",
+    "outOfSync": "Changed since it was sent — click to update it in ProofHub",
     "sendDay": "Send day to ProofHub",
-    "sendDayConfirm": "Send {{count}} entries ({{hours}} total) to ProofHub?",
-    "sendDayPartialFailure": "{{count}} entries couldn't be sent — check them individually.",
-    "linkTask": "Link entries by task number (optional)",
-    "taskLinked": "Linking entries by task number",
-    "taskLinkHint": "Entries with a task number (e.g. #1234) will log against that task id in this list. Entries without one still log at the project/timesheet level.",
-    "selectTodolist": "Task list…"
+    "sendDayConfirm": "Send {{count}} ProofHub entries ({{hours}} in total)?",
+    "unitNote": "sent together as one ProofHub entry: {{count}} entries, {{hours}}",
+    "resendConfirm": "This is already in ProofHub. Send it again? It's updated in place, or recreated if it was deleted there.",
+    "resendDay": "Send day to ProofHub again",
+    "resendDayConfirm": "Everything on this day is already in ProofHub. Send all {{count}} entries ({{hours}}) again? Existing ones are updated in place, deleted ones recreated.",
+    "sendDayFailure": "{{count}} couldn't be sent: {{message}}",
+    "linkTasks": "Log time on the task by its #number",
+    "linkTasksHint": "Entries with a task number (e.g. #1234) are logged on that ProofHub task, in any of the project's task lists. Entries without one are logged on the project.",
+    "errorUnderAMinute": "Less than a minute — nothing to send.",
+    "errorTaskNotFound": "Task {{task}} wasn't found in this ProofHub project — check the number, or turn off task linking for this project."
   }
 }

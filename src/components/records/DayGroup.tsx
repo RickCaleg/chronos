@@ -4,14 +4,13 @@ import { Check, Copy, Loader2, Send } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { confirm } from "@tauri-apps/plugin-dialog";
 import type { Project, TimeEntry } from "../../types";
-import { groupSimilarEntries, type EntryOrGroup } from "../../lib/grouping";
+import type { EntryOrGroup } from "../../lib/grouping";
 import { EntryRow } from "./EntryRow";
 import { GroupedEntryRow } from "./GroupedEntryRow";
 import { useProjectsStore } from "../../store/useProjectsStore";
 import { useLiveElapsed } from "../../hooks/useLiveElapsed";
 import { formatDateShort, formatDayLabel, formatDurationHuman } from "../../lib/time";
-import { isProofHubMappable, pushEntryToProofHub, pushGroupedEntriesToProofHub } from "../../integrations/proofhub/sync";
-import { useProofHubStore } from "../../integrations/proofhub/useProofHubStore";
+import { sendUnits, useSyncPlan } from "../../integrations/proofhub/sync";
 import i18n from "../../i18n";
 
 interface DayGroupProps {
@@ -52,38 +51,27 @@ export function DayGroup({ dayKey, label, items, runningEntry }: DayGroupProps) 
   const referenceEntry = items[0] ? firstEntry(items[0]) : runningEntry ?? null;
   const title = label ? t(`records.${label}`) : referenceEntry ? formatDayLabel(referenceEntry.startTime, i18n.language) : "";
 
-  const allEntries = items.flatMap((item) => (Array.isArray(item) ? item : [item]));
-  const pushable = allEntries.filter((e) => !e.proofhubSyncedAt && isProofHubMappable(e));
+  // The day's ProofHub units (see integrations/proofhub/plan.ts). The
+  // button sends whatever isn't synced yet; once everything is, it turns
+  // into a checkmark that sends the whole day again (e.g. after entries
+  // were deleted or changed in ProofHub itself).
+  const dayUnits = useSyncPlan().units.filter((unit) => unit.day === dayKey);
+  const unsynced = dayUnits.filter((unit) => unit.status !== "synced");
+  const daySynced = dayUnits.length > 0 && unsynced.length === 0;
 
   async function handleSendDay() {
-    const hours = formatDurationHuman(pushable.reduce((s, e) => s + (e.durationSeconds ?? 0), 0));
-    const ok = await confirm(t("proofhub.sendDayConfirm", { count: pushable.length, hours }));
+    const toSend = daySynced ? dayUnits : unsynced;
+    const hours = formatDurationHuman(toSend.reduce((sum, unit) => sum + unit.totalSeconds, 0));
+    const ok = await confirm(
+      t(daySynced ? "proofhub.resendDayConfirm" : "proofhub.sendDayConfirm", { count: toSend.length, hours }),
+    );
     if (!ok) return;
 
     setSendingDay(true);
     setSendError(null);
-    let failures = 0;
-    // When "group pushes by day" is on, sum same-task/description/project
-    // entries into one ProofHub push instead of one per Chronos entry —
-    // same grouping criterion the "group similar entries" display option
-    // uses, applied here independently of whether that display option is on.
-    const groupPushes = useProofHubStore.getState().groupPushesByDay;
-    const toSend: TimeEntry[][] = groupPushes
-      ? groupSimilarEntries(pushable).map((item) => (Array.isArray(item) ? item : [item]))
-      : pushable.map((entry) => [entry]);
-
-    for (const group of toSend) {
-      try {
-        if (group.length > 1) await pushGroupedEntriesToProofHub(group);
-        else await pushEntryToProofHub(group[0]);
-        // A gentle pace under ProofHub's 25-requests/10s limit (docs/proofhub-integration.md section 2.3).
-        await new Promise((resolve) => setTimeout(resolve, 300));
-      } catch {
-        failures++;
-      }
-    }
+    const errors = await sendUnits(toSend);
     setSendingDay(false);
-    if (failures > 0) setSendError(t("proofhub.sendDayPartialFailure", { count: failures }));
+    if (errors.length > 0) setSendError(t("proofhub.sendDayFailure", { count: errors.length, message: errors[0] }));
   }
 
   async function handleCopyDay() {
@@ -114,16 +102,22 @@ export function DayGroup({ dayKey, label, items, runningEntry }: DayGroupProps) 
           >
             {copied ? <Check size={12} className="text-[var(--color-accent)]" /> : <Copy size={12} />}
           </button>
-          {pushable.length > 0 && (
+          {dayUnits.length > 0 && (
             <button
               type="button"
               onClick={handleSendDay}
               disabled={sendingDay}
-              aria-label={t("proofhub.sendDay")}
-              title={t("proofhub.sendDay")}
+              aria-label={t(daySynced ? "proofhub.resendDay" : "proofhub.sendDay")}
+              title={t(daySynced ? "proofhub.resendDay" : "proofhub.sendDay")}
               className="rounded-[2px] p-1 text-[var(--color-text-muted)] opacity-0 outline-none transition-opacity hover:bg-[var(--color-border)] focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)] group-hover:opacity-100"
             >
-              {sendingDay ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+              {sendingDay ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : daySynced ? (
+                <Check size={12} className="text-[var(--color-accent)]" />
+              ) : (
+                <Send size={12} />
+              )}
             </button>
           )}
         </span>

@@ -105,15 +105,23 @@ project must therefore hold a **timesheet id**, not just a project id.
 ### 2.3 Rate limits
 
 **25 requests / 10 seconds** per account+IP (from the official README). Over
-that, ProofHub returns `429` with a `Retry-After` header. Batch pushes (see
-§8.2) must serialize requests with a small delay and honor `Retry-After` on
-a `429` rather than hammering it.
+that, ProofHub returns `429` with a `Retry-After` header. Rather than pacing
+every request up front (a fixed delay made "send day" slow for the common
+handful of entries), the plugin sends at full speed and, on a `429`, waits
+out `Retry-After` (capped at 15s, default 10s) and retries, up to 3 times.
 
 ### 2.4 What's not there
 
 - **No webhooks.** Confirmed absent from the official docs.
 - **No official SDK or maintained client library**, no public Postman
   collection.
+- **No lookup of a task by its `#ticket`** (reported: ProofHub/api_v3#25).
+  `GET /alltodo?projects={id}` does page with `start` (100 per page) and
+  filters `completed` (`false` by default, `true`, or `all`), which is what
+  `find-task` walks.
+- **Errors often come back as HTTP 200** (reported: ProofHub/api_v3#26): a
+  bad API key is a 200 with `{"success":false,...}`, and fetching a resource
+  by a nonexistent id returns the whole collection instead of a 404.
 
 ## 3. Plugin distribution architecture
 
@@ -180,11 +188,9 @@ so the main app can distinguish auth failures, rate limits, and validation
 errors (§9) without parsing ProofHub's raw response body itself.
 
 Actions: `test-connection`, `list-projects`, `list-timesheets`,
-`list-todolists`, `push-entry`, `update-entry`. No `create-timesheet` or
-`list-tasks` — see §6's note on why task-level linking dropped the
-per-project task picker (and, with it, the need to browse a project's
-tasks at all), and why timesheet creation isn't offered either (every
-real user already has one — see §6).
+`find-task` (resolves a `#ticket` to the task's `id` + list, §7),
+`upsert-entry` (updates a time entry in place if it still exists, else
+creates it — §8) and `delete-entry`.
 
 Deliberately **no database access and no credential storage** in this
 binary — it only knows how to talk to ProofHub, given credentials handed to
@@ -301,9 +307,12 @@ ALTER TABLE time_entries ADD COLUMN proofhub_synced_at TEXT;
 ```
 
 Both nullable, both `NULL` until a push succeeds. `proofhub_time_entry_id`
-is what ProofHub's API hands back on a successful `POST .../time` — storing
-it is what makes "already synced" a real fact instead of a guess, and is
-also what a future update/`DELETE` would need. `proofhub_synced_at` drives
+identifies the ProofHub time entry this Chronos entry is part of, stored as
+`projectId/timesheetId/timeId` (since 0.5.5 — a bare `timeId` from an older
+push is read as "in the project's currently mapped timesheet") so an entry
+whose project mapping changed can still be found and cleaned up in its old
+timesheet. Storing it is what makes "already sent" a real fact instead of a
+guess. `proofhub_synced_at` drives
 the sync-status badge (§8) and lets an edit made *after* a push visibly
 fall out of sync (§8.3).
 
@@ -418,15 +427,11 @@ reason.
 
 ### 6.2 Caching the remote lists
 
-`list-projects`/`list-timesheets`/`list-todolists` each spawn the plugin
-binary and make a real ProofHub API call — refetching them every time the
-tab mounts was measurably slow, and on Windows specifically each spawn
-flashed a visible console window (fixed separately, see §3.2's note on
-`CREATE_NO_WINDOW`, but the flashing was also a symptom of fetching far
-more often than necessary). `useProofHubStore` now caches all three
-(`remoteProjects`, `timesheetsByProject`, `todolistsByProject`, the latter
-two keyed by ProofHub project id) and only refetches on an explicit
-"Refresh" click or after disconnect/uninstall clears the cache.
+`list-projects`/`list-timesheets`/`find-task` each spawn the plugin binary
+and make real ProofHub API calls. `useProofHubStore` caches their results
+(`remoteProjects`, `timesheetsByProject`, `tasksByTicket`) until an
+explicit "Refresh" or a disconnect/uninstall. Tickets are only cached once
+found, so a task created in ProofHub after Chronos started is still found.
 
 ## 7. Chronos → ProofHub entity mapping
 
@@ -439,58 +444,63 @@ two keyed by ProofHub project id) and only refetches on an explicit
 | Duration | `logged_hours` + `logged_mins` | Converted from `duration_seconds`. |
 | Entry's calendar day | `date` | `YYYY-MM-DD`, from the entry's local start time. |
 | (mapping's default) | `status` (billable/none) | Per-project default, overridable per push. |
-| Task number (optional) | `task_id` (+ mapping's `list_id`) | **Per-entry, not per-project, and resolved, not passed through directly.** ProofHub tasks have two distinct identifiers — `ticket` (the small, sequential "#1234"-style number the UI shows and Chronos users type as `taskNumber`) and `id` (a large opaque internal id, unrelated to `ticket`, that the API actually needs as `task_id`; confirmed against `api_v3/sections/tasks.md` and ProofHub's own help center). If the entry has a `taskNumber` *and* the project mapping has a default task list configured, `sync.ts`'s `resolveTaskId` lists that task list (cached) and looks up the task whose `ticket` matches, using **its** `id` as `task_id`. Either one missing (no task list configured, or no task number on the entry) just logs at the project/timesheet level, silently — that's the normal case for users not using task-level linking. But if both are set and the ticket doesn't match any task in that list, the push **fails loudly** (no partial/project-level log) rather than degrading silently — see §9. |
+| Task number (optional) | `task_id` + `list_id` | Only when the mapping's "log time on the task by its #number" switch (`linkTasks`) is on. ProofHub tasks have two unrelated identifiers: the `ticket` users see and type ("#1234") and the internal `id` the API needs. The plugin's `find-task` resolves one to the other across **all** of the project's task lists — open tasks first (usually one request), then completed ones. An entry without a task number logs at the project level; a task number that isn't found **fails the send loudly** rather than silently logging at the project level (§9). Mappings from before 0.5.5 that picked a single task list (`todolistId`) read as `linkTasks: true`. |
 
 ## 8. Push UX
 
-### 8.1 Per-entry manual push
+### 8.1 The sync model: units and the plan
 
-Every finished (non-running) entry whose project has a ProofHub mapping
-gets a small sync-status affordance in `EntryRow`/`GroupedEntryRow`, next to
-the existing tag chips: unsynced (send icon) → synced (filled checkmark,
-not re-clickable — re-push would create a duplicate ProofHub entry) → error
-(warning icon, click to retry, tooltip shows the reason).
+A **unit** is whatever becomes exactly one ProofHub time entry: a single
+Chronos entry, or — with the "group pushes by day" setting on — every
+entry on the same day sharing task number, description and project (the
+same criterion as `lib/grouping.ts`, applied independently of the display
+grouping option). A unit's ProofHub entry gets the unit's **total**.
 
-### 8.2 Batch push (per day)
+`src/integrations/proofhub/plan.ts` (`planSync`) is a pure function over
+all entries + mappings + that setting, recomputed only when one of them
+changes (`useSyncPlan` in `sync.ts`). For each unit it decides:
 
-A **"Send day to ProofHub"** button next to the existing copy-to-clipboard
-button in the day-group header, visible only if at least one unsynced,
-mapped entry exists that day. Shows a confirmation summary first, then
-fires requests sequentially with a small delay (§2.3's rate limit),
-continuing past individual failures. No "send week"/"send everything" bulk
-action in v1.
+- **reuse** — the existing ProofHub entry to update in place: the first one
+  referenced by the unit's entries that no earlier unit already claimed and
+  that lives in the unit's current timesheet;
+- **orphans** — ProofHub entries no unit reuses any more (grouping toggled,
+  entries regrouped or moved to another day, project re-mapped), deleted
+  when the unit that references them is sent, so hours are never counted
+  twice;
+- **status** — `new` (never sent), `pending` (needs sending: edited, a new
+  entry joined its group, or its ProofHub entry also holds other units'
+  hours), or `synced`.
 
-**Optional "group pushes by day" setting** (`ProofHubView.tsx`, backed by
-`proofhub.groupPushesByDay` in the `settings` table): when on, "Send day"
-sums entries sharing the same task number, description and project (the
-identical criterion `lib/grouping.ts`'s `groupSimilarEntries` uses for the
-*display* grouping option, applied here independently of whether that
-display option is itself on) into **one** ProofHub push per group instead
-of one per Chronos entry — `sync.ts`'s `pushGroupedEntriesToProofHub`. All
-entries in a group end up sharing the same `proofhub_time_entry_id` /
-`proofhub_synced_at`, since one ProofHub time entry now represents all of
-them; editing just one afterward and re-pushing only it will overwrite the
-shared ProofHub entry with that single entry's hours, not re-sum the whole
-group — a known, accepted limitation rather than something this version
-tracks and reconciles.
+Sending a unit (`sendUnits` in `sync.ts`): resolve the task if linking is
+on, `delete-entry` each orphan, `upsert-entry` with the reused id, then
+mark the unit's entries with the resulting ref and detach any other entries
+still pointing at the reused/deleted ProofHub entries (they become `new`).
+`upsert-entry` checks the time entry still exists first, so a ProofHub
+entry deleted by hand is recreated instead of failing. Units under a minute
+are refused rather than logged as 0h 0m.
 
-### 8.3 Edits after a push
+### 8.2 The buttons
 
-Editing an already-synced entry clears `proofhub_synced_at` (keeps
-`proofhub_time_entry_id`) and the badge shows a distinct "out of sync"
-state; clicking it does a `PUT` (via `update-entry`) instead of a new
-`POST`. Deleting a synced Chronos entry does not delete it from ProofHub
-automatically.
+- **Per row** (`SyncBadge`, in `EntryRow`, and on a collapsed
+  `GroupedEntryRow` when the displayed group is exactly one unit): send
+  (`new`), update (`pending`), error (click to retry; tooltip has the
+  reason), or a checkmark (`synced`) — which is clickable too: after a
+  confirmation it sends the unit again. That's the answer to "I deleted or
+  fixed it in ProofHub, now resend it". A row always sends its whole unit.
+- **Per day** (day header, next to copy): sends every unit of the day that
+  isn't synced, after a confirmation with the count and total. Once the
+  whole day is synced it becomes a checkmark that resends the whole day.
+  Failures don't stop the rest; the first error is shown under the header
+  and each failed row keeps its own.
 
-**Fixed bug (confirmed from a real report):** `update-entry`'s request
-struct in `proofhub-plugin/src/main.rs` never declared `list_id`/`task_id`
-fields at all, even though `sync.ts` always sent them when applicable —
-serde silently drops unknown JSON fields by default, so every re-push
-(every "out of sync" click) sent the entry without task-level linking
-regardless of the project mapping, degrading to project/timesheet-level
-logging with no error. `push-entry` (a genuine first push) was never
-affected. Fixed by adding the two fields to `UpdateEntry` and passing them
-through to `time_entry_body` the same way `PushEntry` already did.
+### 8.3 Edits and deletes after a push
+
+Editing an entry's content clears `proofhub_synced_at` (the unit becomes
+`pending`). Deleting an entry that shared a ProofHub entry with others
+marks those others `pending`, so resending corrects the total. Deleting an
+entry that was its ProofHub entry's only member leaves that ProofHub entry
+alone — Chronos never deletes hours in ProofHub the user didn't ask to
+resend.
 
 ### 8.4 No auto-push on stop
 
@@ -541,7 +551,7 @@ tab as a collapsed "Debug log" disclosure (`proofhub_read_debug_log`/
 `proofhub_clear_debug_log` commands) with copy/clear buttons. Exists
 specifically because the bug above was undiagnosable blind — the plugin's
 own stderr is discarded (§3.2) and nothing was previously logged anywhere.
-`push-entry`/`update-entry` also now return ProofHub's full raw response
+`upsert-entry` also returns ProofHub's full raw response
 body (not just the extracted `id`), so the log shows exactly what ProofHub
 echoed back for `list_id`/`task_id`, not just whether the call nominally
 succeeded.
@@ -604,7 +614,9 @@ ask), targeting v0.5.0:**
   revealed `taskNumber` can't be sent to the API directly — see §7's
   updated row and §9's `ticket`-vs-`id` note. It's used internally now
   (`resolveTaskId` in `sync.ts`, cached the same way the other remote
-  lists are), not re-exposed as a picker.
+  lists are), not re-exposed as a picker. (0.5.5 later replaced both
+  `list-todolists` and `list-tasks` with `find-task`, which searches every
+  list of the project — see §7.)
 - Also dropped the "create a timesheet" convenience button per the same
   feedback: real ProofHub users always already have one to pick from, so
   `create-timesheet` was removed from the plugin binary too.

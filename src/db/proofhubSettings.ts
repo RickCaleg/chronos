@@ -15,15 +15,20 @@ export interface ProofHubProjectMapping {
   timesheetTitle: string;
   defaultBillable: boolean;
   /**
-   * Optional default task list, used for per-entry task-level linking: a
-   * pushed entry with a `taskNumber` (e.g. "#1234") sends `1234` as the
-   * ProofHub task id within this list. Without this set, entries always
-   * log at the project/timesheet level regardless of their task number.
+   * Link time to the ProofHub task whose ticket matches each entry's
+   * `taskNumber` ("#1234"), in whichever task list of the project it lives.
+   * Entries without a task number still log at the project/timesheet level.
    */
+  linkTasks?: boolean;
+  /** Before 0.5.5, linking was set up by picking one task list; kept only so those mappings still read as linkTasks. */
   todolistId?: string;
 }
 
 export type ProofHubProjectMap = Record<string, ProofHubProjectMapping>;
+
+export function linksTasks(mapping: ProofHubProjectMapping): boolean {
+  return mapping.linkTasks ?? Boolean(mapping.todolistId);
+}
 
 const PROJECT_MAP_KEY = "proofhub.projectMap";
 

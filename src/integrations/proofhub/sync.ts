@@ -1,128 +1,113 @@
 import type { TimeEntry } from "../../types";
-import type { ProofHubProjectMapping } from "../../db/proofhubSettings";
+import type { ProofHubProjectMap } from "../../db/proofhubSettings";
+import { linksTasks } from "../../db/proofhubSettings";
 import { useProofHubStore } from "./useProofHubStore";
 import { useEntriesStore } from "../../store/useEntriesStore";
-import { formatLocalDate } from "../../lib/time";
+import { formatLocalDate, nowIso } from "../../lib/time";
+import { encodeRemoteRef, planSync, type SyncUnit } from "./plan";
+import i18n from "../../i18n";
 
 /**
- * ProofHub tasks have two distinct identifiers (confirmed against the real
- * API + ProofHub's own help center): `ticket` is the small, sequential
- * "#1234"-style number the UI shows and Chronos users actually type as
- * `taskNumber`; `id` is a large opaque internal id, and that's what the API
- * needs as `task_id` — the two are unrelated numbers. This resolves a
- * Chronos entry's typed ticket to the real id by listing the mapped
- * project's default task list (cached — see useProofHubStore) and matching.
- *
- * Returns `null` when task-level linking isn't applicable at all (no
- * default task list configured, or the entry has no task number) — that's
- * the normal, silent "just log at the project/timesheet level" case.
- * Throws when linking clearly *was* intended (both are set) but the ticket
- * doesn't match any task in that list — surfacing that loudly instead of
- * silently falling back, since a wrong list/typo'd ticket is exactly the
- * kind of thing that should not fail silently (see docs/proofhub-integration.md
- * section 9's note on this bug).
+ * Executes the plans from plan.ts: every send goes through `sendUnits`,
+ * whether it's one row's button or the day's. See
+ * docs/proofhub-integration.md section 8.
  */
-async function resolveTaskId(mapping: ProofHubProjectMapping, representative: TimeEntry): Promise<string | null> {
-  if (!mapping.todolistId || !representative.taskNumber) return null;
-  const ticket = representative.taskNumber.replace(/^#/, "");
-  const tasks = await useProofHubStore.getState().loadTasks(mapping.proofhubProjectId, mapping.todolistId);
-  const match = tasks.find((task) => task.ticket === ticket);
-  if (!match) {
-    throw new Error(
-      `Task ${representative.taskNumber} wasn't found in the configured task list — check the ticket number and the mapped task list.`,
-    );
-  }
-  return match.id;
+
+export interface SyncPlan {
+  units: SyncUnit[];
+  byEntryId: Map<string, SyncUnit>;
 }
 
-function buildPayload(
-  mapping: ProofHubProjectMapping,
-  representative: TimeEntry,
-  totalSeconds: number,
-  resolvedTaskId: string | null,
-) {
-  const totalMinutes = Math.round(totalSeconds / 60);
-  const loggedHours = Math.floor(totalMinutes / 60);
-  const loggedMins = totalMinutes % 60;
+const EMPTY_PLAN: SyncPlan = { units: [], byEntryId: new Map() };
+let memo: { entries: TimeEntry[]; projectMap: ProofHubProjectMap; grouped: boolean; plan: SyncPlan } | null = null;
 
-  return {
-    projectId: mapping.proofhubProjectId,
-    timesheetId: mapping.timesheetId,
-    loggedHours,
-    loggedMins,
-    date: formatLocalDate(representative.startTime),
+/**
+ * The current plan, shared by every row and day header and recomputed only
+ * when entries, mappings or the grouping setting actually change — not
+ * once per badge per render.
+ */
+export function useSyncPlan(): SyncPlan {
+  const entries = useEntriesStore((s) => s.entries);
+  const installed = useProofHubStore((s) => s.installed);
+  const projectMap = useProofHubStore((s) => s.projectMap);
+  const grouped = useProofHubStore((s) => s.groupPushesByDay);
+  if (!installed) return EMPTY_PLAN;
+  if (!memo || memo.entries !== entries || memo.projectMap !== projectMap || memo.grouped !== grouped) {
+    const units = planSync(entries, projectMap, grouped);
+    const byEntryId = new Map<string, SyncUnit>();
+    for (const unit of units) for (const entry of unit.entries) byEntryId.set(entry.id, unit);
+    memo = { entries, projectMap, grouped, plan: { units, byEntryId } };
+  }
+  return memo.plan;
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+async function sendUnit(unit: SyncUnit): Promise<void> {
+  const { projectMap, call, findTask } = useProofHubStore.getState();
+  const mapping = projectMap[unit.chronosProjectId];
+  const first = unit.entries[0];
+
+  const totalMinutes = Math.round(unit.totalSeconds / 60);
+  if (totalMinutes === 0) throw new Error(i18n.t("proofhub.errorUnderAMinute"));
+
+  // ProofHub's UI shows tasks by "#ticket", but the API needs the task's
+  // internal id — two unrelated numbers — so resolve one to the other.
+  let task = null;
+  if (linksTasks(mapping) && first.taskNumber) {
+    task = await findTask(unit.target.projectId, first.taskNumber.replace(/^#/, ""));
+    if (!task) throw new Error(i18n.t("proofhub.errorTaskNotFound", { task: first.taskNumber }));
+  }
+
+  for (const orphan of unit.orphans) {
+    await call("delete-entry", { projectId: orphan.projectId, timesheetId: orphan.timesheetId, timeId: orphan.timeId });
+  }
+
+  const result = await call<{ id: string }>("upsert-entry", {
+    projectId: unit.target.projectId,
+    timesheetId: unit.target.timesheetId,
+    timeId: unit.reuse?.timeId ?? null,
+    loggedHours: Math.floor(totalMinutes / 60),
+    loggedMins: totalMinutes % 60,
+    date: formatLocalDate(first.startTime),
     status: mapping.defaultBillable ? "billable" : "none",
-    description: representative.taskNumber
-      ? `${representative.taskNumber} - ${representative.description}`
-      : representative.description,
-    ...(mapping.todolistId && resolvedTaskId ? { listId: mapping.todolistId, taskId: resolvedTaskId } : {}),
-  };
-}
-
-/** Pushes (or, if already synced, updates) one entry to its mapped ProofHub project/timesheet. Throws with a user-facing message on failure — callers surface it, they don't need to interpret it. */
-export async function pushEntryToProofHub(entry: TimeEntry): Promise<void> {
-  const { projectMap, call } = useProofHubStore.getState();
-  if (!entry.projectId) throw new Error("This entry has no project, so there's nothing to map to ProofHub.");
-  const mapping = projectMap[entry.projectId];
-  if (!mapping) throw new Error("This entry's project isn't mapped to a ProofHub project yet.");
-
-  const resolvedTaskId = await resolveTaskId(mapping, entry);
-  const payload = buildPayload(mapping, entry, entry.durationSeconds ?? 0, resolvedTaskId);
-
-  let proofhubTimeEntryId = entry.proofhubTimeEntryId;
-  if (proofhubTimeEntryId) {
-    await call("update-entry", { ...payload, timeId: proofhubTimeEntryId });
-  } else {
-    const result = await call<{ id: string }>("push-entry", payload);
-    proofhubTimeEntryId = result.id || null;
-  }
-
-  await useEntriesStore.getState().update(entry.id, {
-    proofhubTimeEntryId,
-    proofhubSyncedAt: new Date().toISOString(),
+    description: first.taskNumber ? `${first.taskNumber} - ${first.description}` : first.description,
+    ...(task ? { listId: task.listId, taskId: task.id } : {}),
   });
+
+  const ref = encodeRemoteRef({ ...unit.target, timeId: result.id });
+  const syncedAt = nowIso();
+  const { update } = useEntriesStore.getState();
+  for (const id of unit.releaseEntryIds) {
+    await update(id, { proofhubTimeEntryId: null, proofhubSyncedAt: null });
+  }
+  for (const entry of unit.entries) {
+    await update(entry.id, { proofhubTimeEntryId: ref, proofhubSyncedAt: syncedAt });
+  }
 }
 
 /**
- * Sums a group of entries that share the same task number, description and
- * project (the "group similar entries" criterion — see lib/grouping.ts)
- * into a single ProofHub push, instead of one push per Chronos entry. Used
- * by DayGroup's "send day" batch action when the "group pushes by day"
- * setting is on. All entries in the group end up with the same
- * proofhubTimeEntryId/proofhubSyncedAt, since they're now represented by
- * one ProofHub time entry.
+ * Sends units one after another (ProofHub rate limits are handled by the
+ * plugin, which waits out a 429). A failed unit doesn't stop the rest; its
+ * error is kept on its rows until the next successful send. Returns the
+ * error messages, in order.
  */
-export async function pushGroupedEntriesToProofHub(entries: TimeEntry[]): Promise<void> {
-  if (entries.length === 0) return;
-  const representative = entries[0];
-  const { projectMap, call } = useProofHubStore.getState();
-  if (!representative.projectId) throw new Error("This entry has no project, so there's nothing to map to ProofHub.");
-  const mapping = projectMap[representative.projectId];
-  if (!mapping) throw new Error("This entry's project isn't mapped to a ProofHub project yet.");
-
-  const resolvedTaskId = await resolveTaskId(mapping, representative);
-  const totalSeconds = entries.reduce((sum, e) => sum + (e.durationSeconds ?? 0), 0);
-  const payload = buildPayload(mapping, representative, totalSeconds, resolvedTaskId);
-
-  // If any entry in the group was already synced, update that same
-  // ProofHub entry instead of creating a duplicate.
-  let proofhubTimeEntryId = entries.find((e) => e.proofhubTimeEntryId)?.proofhubTimeEntryId ?? null;
-  if (proofhubTimeEntryId) {
-    await call("update-entry", { ...payload, timeId: proofhubTimeEntryId });
-  } else {
-    const result = await call<{ id: string }>("push-entry", payload);
-    proofhubTimeEntryId = result.id || null;
+export async function sendUnits(units: SyncUnit[]): Promise<string[]> {
+  const { setSendState } = useProofHubStore.getState();
+  const errors: string[] = [];
+  for (const unit of units) {
+    const ids = unit.entries.map((e) => e.id);
+    setSendState(ids, true);
+    try {
+      await sendUnit(unit);
+      setSendState(ids, false, null);
+    } catch (err) {
+      const message = errorMessage(err);
+      errors.push(message);
+      setSendState(ids, false, message);
+    }
   }
-
-  const syncedAt = new Date().toISOString();
-  const { update } = useEntriesStore.getState();
-  for (const entry of entries) {
-    await update(entry.id, { proofhubTimeEntryId, proofhubSyncedAt: syncedAt });
-  }
-}
-
-/** Whether this entry's project has a ProofHub mapping at all — gates whether any sync affordance should render. */
-export function isProofHubMappable(entry: TimeEntry): boolean {
-  if (!entry.projectId) return false;
-  return Boolean(useProofHubStore.getState().projectMap[entry.projectId]);
+  return errors;
 }

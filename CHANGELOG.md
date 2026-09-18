@@ -4,6 +4,18 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Changed
+- Reworked ProofHub sending around one consistent model (see `docs/proofhub-integration.md` §8). Each row and each day's button send whatever isn't in ProofHub yet, and with "group pushes by day" on, a group is always sent with its full total.
+- The ✓ on an already-sent row or day is now clickable and sends it again. Entries deleted in ProofHub are recreated, and changed ones are overwritten.
+- Task linking is now a single switch per project ("log time on the task by its #number") and finds the task in any of the project's task lists, instead of requiring one list to be picked.
+- Sending a day is faster: no fixed delay between entries, and ProofHub rate limits are waited out only when actually hit.
+### Fixed
+- Resending an entry whose ProofHub entry had been deleted there failed. It's now recreated.
+- With grouped pushes, editing one entry of an already-sent group and resending it overwrote the group's ProofHub total with that single entry's hours, and a new same-task entry on the same day was sent as a separate ProofHub entry instead of joining its group's total.
+- Switching "group pushes by day" on or off, or re-mapping a project to another timesheet, could leave the old ProofHub entries behind and count those hours twice. The old entries are now removed when the day is resent.
+- Deleting one entry of a grouped push left the ProofHub total including its time. The rest of the group is now marked for resending.
+- A task created in ProofHub after Chronos was opened wasn't found until a restart.
+- "Send day" failures now say what went wrong instead of only how many failed.
 
 ## [0.5.4] - 2026-09-18
 ### Fixed
