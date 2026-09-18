@@ -4,6 +4,8 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.5.3] - 2026-09-18
 ### Added
 - Optional "group pushes by day": sums same-task/description/project entries into one ProofHub push instead of one per Chronos entry.
 - A "Debug log" in the ProofHub tab showing the exact request/response of the last ProofHub call, for diagnosing pushes that don't behave as expected.
