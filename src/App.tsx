@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { TopNav, type View } from "./components/TopNav";
@@ -12,8 +12,15 @@ import { useEntriesStore } from "./store/useEntriesStore";
 import { useTagsStore } from "./store/useTagsStore";
 import { useUpdaterStore } from "./store/useUpdaterStore";
 import { useAppSettingsStore } from "./store/useAppSettingsStore";
+import { useProofHubStore } from "./integrations/proofhub/useProofHubStore";
 import { runAutoBackupIfDue } from "./lib/autoBackup";
 import { nowIso } from "./lib/time";
+
+// Lazy-loaded so its code isn't on the JS execution path for a user who
+// never installs the ProofHub plugin — see docs/proofhub-integration.md.
+const ProofHubView = lazy(() =>
+  import("./integrations/proofhub/ProofHubView").then((m) => ({ default: m.ProofHubView })),
+);
 
 /** How often to re-check whether an auto-backup is due while the app stays open. */
 const AUTO_BACKUP_CHECK_INTERVAL_MS = 15 * 60 * 1000;
@@ -33,6 +40,10 @@ function App() {
     loadEntries();
     loadTags();
     useUpdaterStore.getState().checkForUpdates();
+    // Just the installed/connected status (file checks, no network/process
+    // spawn) — needed app-wide so TopNav knows whether to show the tab at
+    // all. Actual ProofHub data fetches only happen inside ProofHubView.
+    useProofHubStore.getState().load();
   }, [loadProjects, loadEntries, loadTags]);
 
   useEffect(() => {
@@ -98,6 +109,10 @@ function App() {
           </div>
         ) : view === "projects" ? (
           <ProjectsView />
+        ) : view === "proofhub" ? (
+          <Suspense fallback={null}>
+            <ProofHubView />
+          </Suspense>
         ) : (
           <SettingsView />
         )}

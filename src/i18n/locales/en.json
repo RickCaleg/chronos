@@ -3,7 +3,8 @@
     "timer": "Timer",
     "records": "Records",
     "projects": "Projects",
-    "settings": "Settings"
+    "settings": "Settings",
+    "proofhub": "ProofHub"
   },
   "palette": {
     "placeholder": "Type a command...",
@@ -151,6 +152,9 @@
     "description": "Send logged hours to ProofHub projects and tasks. Nothing related to this is downloaded or contacted until you install it.",
     "install": "Install",
     "uninstall": "Uninstall",
+    "manageInTab": "Installed — connect and manage project mappings in the ProofHub tab.",
+    "projectMappings": "Project mappings",
+    "refresh": "Refresh",
     "subdomain": "ProofHub subdomain",
     "apiKey": "API key",
     "apiKeyHint": "In ProofHub: profile icon (bottom-left) → API access.",

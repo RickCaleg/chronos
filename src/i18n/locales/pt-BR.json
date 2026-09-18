@@ -3,7 +3,8 @@
     "timer": "Timer",
     "records": "Registros",
     "projects": "Projetos",
-    "settings": "Configurações"
+    "settings": "Configurações",
+    "proofhub": "ProofHub"
   },
   "palette": {
     "placeholder": "Digite um comando...",
@@ -151,6 +152,9 @@
     "description": "Envie as horas lançadas para projetos e tarefas do ProofHub. Nada relacionado a isso é baixado ou contatado até você instalar.",
     "install": "Instalar",
     "uninstall": "Desinstalar",
+    "manageInTab": "Instalado — conecte e gerencie os mapeamentos de projeto na aba ProofHub.",
+    "projectMappings": "Mapeamento de projetos",
+    "refresh": "Atualizar",
     "subdomain": "Subdomínio do ProofHub",
     "apiKey": "Chave de API",
     "apiKeyHint": "No ProofHub: ícone de perfil (canto inferior esquerdo) → API access.",

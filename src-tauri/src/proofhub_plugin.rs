@@ -181,12 +181,21 @@ fn run_plugin(
     request.insert("subdomain".to_string(), Value::String(subdomain.to_string()));
     request.insert("apiKey".to_string(), Value::String(api_key.to_string()));
 
-    let mut child = Command::new(&path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|e| format!("Couldn't start the ProofHub plugin: {e}"))?;
+    let mut command = Command::new(&path);
+    command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
+
+    // Without this, every spawn flashes a visible console window on Windows
+    // — chronos-proofhub-plugin is a console-subsystem binary, and Windows
+    // gives any child process its own console unless explicitly told not
+    // to. No equivalent issue on Linux/macOS.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let mut child = command.spawn().map_err(|e| format!("Couldn't start the ProofHub plugin: {e}"))?;
 
     {
         let stdin = child

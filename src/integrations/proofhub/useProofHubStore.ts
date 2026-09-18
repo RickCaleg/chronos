@@ -3,6 +3,11 @@ import { invoke } from "@tauri-apps/api/core";
 import * as proofhubDb from "../../db/proofhubSettings";
 import type { ProofHubProjectMap, ProofHubProjectMapping } from "../../db/proofhubSettings";
 
+export interface RemoteItem {
+  id: string;
+  title: string;
+}
+
 interface PluginStatus {
   installed: boolean;
   version: string | null;
@@ -18,6 +23,17 @@ interface ProofHubState {
   busy: boolean;
   error: string | null;
 
+  /**
+   * Cached results of `list-projects`/`list-timesheets`/`list-todolists` —
+   * each one spawns the plugin binary and makes a real ProofHub API call,
+   * so refetching on every mount of the settings/mapping UI was both slow
+   * and (on Windows) visibly flashed a console window per spawn. Cleared
+   * only on disconnect/uninstall or an explicit refresh.
+   */
+  remoteProjects: RemoteItem[] | null;
+  timesheetsByProject: Record<string, RemoteItem[]>;
+  todolistsByProject: Record<string, RemoteItem[]>;
+
   load: () => Promise<void>;
   install: () => Promise<void>;
   uninstall: () => Promise<void>;
@@ -26,6 +42,10 @@ interface ProofHubState {
   setMapping: (chronosProjectId: string, mapping: ProofHubProjectMapping) => Promise<void>;
   removeMapping: (chronosProjectId: string) => Promise<void>;
   call: <T = unknown>(action: string, payload?: Record<string, unknown>) => Promise<T>;
+
+  loadRemoteProjects: (force?: boolean) => Promise<RemoteItem[]>;
+  loadTimesheets: (proofhubProjectId: string, force?: boolean) => Promise<RemoteItem[]>;
+  loadTodolists: (proofhubProjectId: string, force?: boolean) => Promise<RemoteItem[]>;
 }
 
 export const useProofHubStore = create<ProofHubState>((set, get) => ({
@@ -36,6 +56,9 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
   projectMap: {},
   busy: false,
   error: null,
+  remoteProjects: null,
+  timesheetsByProject: {},
+  todolistsByProject: {},
 
   load: async () => {
     const [status, subdomain, projectMap] = await Promise.all([
@@ -69,6 +92,7 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
     set({ busy: true, error: null });
     try {
       await invoke("proofhub_plugin_uninstall");
+      set({ remoteProjects: null, timesheetsByProject: {}, todolistsByProject: {} });
       await get().load();
     } finally {
       set({ busy: false });
@@ -93,6 +117,7 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
 
   disconnect: async () => {
     await invoke("proofhub_clear_credentials");
+    set({ remoteProjects: null, timesheetsByProject: {}, todolistsByProject: {} });
     await get().load();
   },
 
@@ -107,4 +132,28 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
   },
 
   call: (action, payload = {}) => invoke("proofhub_plugin_call", { action, payload }),
+
+  loadRemoteProjects: async (force = false) => {
+    const cached = get().remoteProjects;
+    if (cached && !force) return cached;
+    const projects = await get().call<RemoteItem[]>("list-projects");
+    set({ remoteProjects: projects });
+    return projects;
+  },
+
+  loadTimesheets: async (proofhubProjectId, force = false) => {
+    const cached = get().timesheetsByProject[proofhubProjectId];
+    if (cached && !force) return cached;
+    const timesheets = await get().call<RemoteItem[]>("list-timesheets", { projectId: proofhubProjectId });
+    set((state) => ({ timesheetsByProject: { ...state.timesheetsByProject, [proofhubProjectId]: timesheets } }));
+    return timesheets;
+  },
+
+  loadTodolists: async (proofhubProjectId, force = false) => {
+    const cached = get().todolistsByProject[proofhubProjectId];
+    if (cached && !force) return cached;
+    const todolists = await get().call<RemoteItem[]>("list-todolists", { projectId: proofhubProjectId });
+    set((state) => ({ todolistsByProject: { ...state.todolistsByProject, [proofhubProjectId]: todolists } }));
+    return todolists;
+  },
 }));

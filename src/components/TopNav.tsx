@@ -1,11 +1,12 @@
 import { useTranslation } from "react-i18next";
-import { Clock, FolderKanban, Settings } from "lucide-react";
+import { Clock, FolderKanban, Plug, Settings } from "lucide-react";
 import { cn } from "../lib/cn";
 import { useUpdaterStore } from "../store/useUpdaterStore";
+import { useProofHubStore } from "../integrations/proofhub/useProofHubStore";
 
-export type View = "timer" | "projects" | "settings";
+export type View = "timer" | "projects" | "settings" | "proofhub";
 
-const ITEMS: { view: View; icon: typeof Clock; labelKey: string }[] = [
+const BASE_ITEMS: { view: View; icon: typeof Clock; labelKey: string }[] = [
   { view: "timer", icon: Clock, labelKey: "nav.timer" },
   { view: "projects", icon: FolderKanban, labelKey: "nav.projects" },
   { view: "settings", icon: Settings, labelKey: "nav.settings" },
@@ -15,10 +16,16 @@ export function TopNav({ current, onChange }: { current: View; onChange: (v: Vie
   const { t } = useTranslation();
   const updaterStatus = useUpdaterStore((s) => s.status);
   const updateAvailable = updaterStatus === "available" || updaterStatus === "ready";
+  // Only shown once the plugin is installed — see docs/proofhub-integration.md
+  // section 6 on keeping this invisible until the user opts in.
+  const proofhubInstalled = useProofHubStore((s) => s.installed);
+  const items = proofhubInstalled
+    ? [...BASE_ITEMS, { view: "proofhub" as View, icon: Plug, labelKey: "nav.proofhub" }]
+    : BASE_ITEMS;
 
   return (
     <nav className="flex items-center gap-1 border-b border-[var(--color-border)] px-4 pt-3">
-      {ITEMS.map(({ view, icon: Icon, labelKey }) => (
+      {items.map(({ view, icon: Icon, labelKey }) => (
         <button
           key={view}
           onClick={() => onChange(view)}

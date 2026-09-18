@@ -194,6 +194,14 @@ it on stdin for that single call. This keeps its dependency footprint small
 binary can't itself go read `chronos.db` or the credential file — it never
 has a path to either.
 
+**Windows note:** `chronos-proofhub-plugin` is a console-subsystem binary;
+spawning it from the (GUI-subsystem) Tauri app flashes a visible console
+window per spawn unless the spawn sets `CREATE_NO_WINDOW`
+(`src-tauri/src/proofhub_plugin.rs`'s `run_plugin`, via
+`std::os::windows::process::CommandExt::creation_flags`). Combined with
+§6.2's caching (fewer spawns to begin with), this is what fixed a real user
+report of Settings feeling "extremely slow" on Windows.
+
 ### 3.3 Install / uninstall flow (main app, Rust side)
 
 New module `src-tauri/src/proofhub_plugin.rs`:
@@ -350,39 +358,65 @@ the JS perspective ("save this key," never "give me the key").
 
 ## 6. Settings UX — the "plugin" surface
 
-New collapsible section in Settings, after "Startup & shortcuts," titled
-**"Integrations."** The section header/description shown before install is
-intentionally generic (name, one-line description, an Install button) —
-this shell ships in the base app because *some* UI has to exist to offer
-the feature at all, but it contains no ProofHub API knowledge, just a
-label and a download trigger. Everything past this point is a lazy-loaded
-(`React.lazy`) component, so its code isn't on the JS execution path for a
-user who never installs.
+**Revised:** the install entry point stays in Settings, but everything past
+install (connect, project mapping, task linking) lives in its own top-level
+tab, not a Settings section — see §6.1. Two reasons: that surface deserves
+real page space once a user actually has several projects to map, and it
+means the tab (and the plugin-binary spawns its data fetches trigger, see
+§6.2) only mounts when the user is actually looking at it, not every time
+they open the generic Settings page for something unrelated.
 
+**Settings section** (`ProofHubSettings.tsx`, still in the collapsible
+"Integrations" area, after "Startup & shortcuts"): a generic name +
+one-line description + a single action button. It contains no ProofHub API
+knowledge either way:
 1. **Not installed (default):** "ProofHub — send logged hours to ProofHub
    projects and tasks. [Install]". Clicking Install calls
-   `proofhub_plugin_install` (§3.3), shows progress (download → verify →
-   done), and reveals step 2 on success. A failed signature check shows a
-   clear "the downloaded plugin failed verification and was not installed"
-   message — never a silent partial install.
-2. **Installed, not connected:** two fields — "ProofHub subdomain" (with a
-   hint: "the part before `.proofhub.com` in your ProofHub URL") and "API
-   key" (password-masked, with a link to ProofHub's own "API access"
-   profile page). A "Test & connect" button calls `proofhub_plugin_call
-   ("test-connection", ...)`; success saves the credential (§5) and reveals
-   step 3.
-3. **Connected — project mapping table:** one row per non-archived Chronos
-   project: a ProofHub-project dropdown, a timesheet dropdown for that
-   project, an optional "link entries by task number" disclosure (a single
+   `proofhub_plugin_install` (§3.3). A failed signature check shows a clear
+   "the downloaded plugin failed verification and was not installed"
+   message — never a silent partial install. On success, the new tab
+   appears in the top nav immediately (`TopNav.tsx` reads
+   `useProofHubStore`'s `installed` flag directly).
+2. **Installed:** the description swaps to "Installed — connect and manage
+   project mappings in the ProofHub tab," and the button becomes
+   "Uninstall" (§3.3) — dropping back to state 1 and hiding the tab again.
+   Uninstalling doesn't touch saved credentials or already-pushed entries'
+   sync metadata (§4.1); disconnecting (§6.1) is a separate action.
+
+### 6.1 The ProofHub tab (`ProofHubView.tsx`)
+
+Only reachable once installed (`TopNav.tsx` only renders the nav item when
+`useProofHubStore().installed`); lazy-loaded the same way the Settings
+section is, for the same "no code on the JS execution path until used"
+reason.
+
+1. **Not connected:** "ProofHub subdomain" (hint: "the part before
+   `.proofhub.com`") + "API key" (password-masked, with a link to
+   ProofHub's own "API access" profile page) + "Test & connect," which
+   calls `proofhub_plugin_call("test-connection", ...)` and saves the
+   credential (§5) on success.
+2. **Connected — project mapping table:** a header with a manual "Refresh"
+   button (§6.2), then one row per non-archived Chronos project: a
+   ProofHub-project dropdown, a timesheet dropdown for that project, an
+   optional "link entries by task number" disclosure (a single
    default-todolist dropdown — see §7 for why there's no per-project task
    picker), and a default billable toggle. Unmapped Chronos projects show
    no sync affordance anywhere in the app. No "create a timesheet"
    convenience — every real ProofHub user already has one to pick from.
-4. **"Disconnect"** clears the credential and `proofhub.*` mapping/enabled
-   settings, dropping back to step 2's empty form. **"Uninstall"** (a
-   separate action, further down) removes the downloaded binary entirely
-   (§3.3), dropping back to step 1. Neither touches already-pushed entries'
-   sync metadata (§4.1).
+3. **"Disconnect"** clears the credential and `proofhub.*` mapping
+   settings and the cached remote lists (§6.2), dropping back to state 1.
+
+### 6.2 Caching the remote lists
+
+`list-projects`/`list-timesheets`/`list-todolists` each spawn the plugin
+binary and make a real ProofHub API call — refetching them every time the
+tab mounts was measurably slow, and on Windows specifically each spawn
+flashed a visible console window (fixed separately, see §3.2's note on
+`CREATE_NO_WINDOW`, but the flashing was also a symptom of fetching far
+more often than necessary). `useProofHubStore` now caches all three
+(`remoteProjects`, `timesheetsByProject`, `todolistsByProject`, the latter
+two keyed by ProofHub project id) and only refetches on an explicit
+"Refresh" click or after disconnect/uninstall clears the cache.
 
 ## 7. Chronos → ProofHub entity mapping
 
@@ -451,10 +485,15 @@ control." Revisit only if real usage shows people want it.
   public key constant.
 - **`src-tauri/src/proofhub_credentials.rs`** (new) — encrypted
   credential file read/write (§5).
-- **`src/integrations/proofhub/`** (new) — `ProofHubSettings.tsx` (§6,
-  lazy-loaded), `useProofHubStore.ts`, the shared sync-badge component used
-  by `EntryRow`/`GroupedEntryRow` (§8.1), the day-header "Send day" button
+- **`src/integrations/proofhub/`** — `ProofHubSettings.tsx` (§6, the
+  generic install/uninstall teaser, lazy-loaded), `ProofHubView.tsx` (§6.1,
+  the dedicated tab: connect + mapping, also lazy-loaded),
+  `useProofHubStore.ts` (state + the §6.2 remote-list caching), `sync.ts`
+  (the push logic), the shared sync-badge component used by
+  `EntryRow`/`GroupedEntryRow` (§8.1), the day-header "Send day" button
   logic (§8.2).
+- **`src/components/TopNav.tsx`** — reads `useProofHubStore`'s `installed`
+  flag directly to decide whether to render the ProofHub nav item at all.
 - **`src/db/proofhubSettings.ts`** (new) — alongside the other `db/`
   modules (§4.3).
 - **No new webview capability entries** — all HTTP happens in Rust
