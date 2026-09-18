@@ -9,7 +9,8 @@ All notable changes to Chronos are documented here. Format loosely follows
 - A "Debug log" in the ProofHub tab showing the exact request/response of the last ProofHub call, for diagnosing pushes that don't behave as expected.
 ### Fixed
 - Task-level linking was silently dropped on every re-push ("out of sync" retry) — the plugin's update-entry action never actually read the task/list id fields the app was already sending.
-- ProofHub responses that fail with an HTTP 200 and `success: false` in the body (confirmed for a bad API key, suspected for rejected task links) were being treated as successful pushes.
+- ProofHub responses that fail with an HTTP 200 and `success: false` in the body (confirmed for a bad API key) were being treated as successful pushes.
+- Task-level linking never actually worked: the task number typed in Chronos (ProofHub's `ticket` field) was sent straight through as the API's `task_id`, but those are different, unrelated numbers. Now resolved from `ticket` to the real `id` before every push.
 
 ## [0.5.2] - 2026-09-18
 ### Changed

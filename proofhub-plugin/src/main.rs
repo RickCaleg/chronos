@@ -41,6 +41,13 @@ enum Request {
         project_id: String,
     },
     #[serde(rename_all = "camelCase")]
+    ListTasks {
+        subdomain: String,
+        api_key: String,
+        project_id: String,
+        todolist_id: String,
+    },
+    #[serde(rename_all = "camelCase")]
     PushEntry {
         subdomain: String,
         api_key: String,
@@ -205,6 +212,22 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
             )?;
             Ok(Value::Array(
                 extract_list(&body, &["todolists"]).into_iter().map(normalize_item).collect(),
+            ))
+        }
+        Request::ListTasks {
+            subdomain,
+            api_key,
+            project_id,
+            todolist_id,
+        } => {
+            let body = get(
+                client,
+                &subdomain,
+                &api_key,
+                &format!("/projects/{project_id}/todolists/{todolist_id}/tasks"),
+            )?;
+            Ok(Value::Array(
+                extract_list(&body, &["tasks"]).into_iter().map(normalize_task_item).collect(),
             ))
         }
         Request::PushEntry {
@@ -408,6 +431,22 @@ fn normalize_item(item: &Value) -> Value {
     json!({
         "id": stringify_id(item.get("id")),
         "title": item.get("title").and_then(Value::as_str).unwrap_or("").to_string(),
+    })
+}
+
+/// Tasks specifically carry a `ticket` field distinct from `id` — `ticket`
+/// is the small, sequential, "#1234"-style number ProofHub's own UI shows
+/// the user (confirmed via ProofHub's help center: sequential per account,
+/// prefixed with "#" in the UI); `id` is a large opaque internal identifier
+/// with no relation to that number, and is what the API actually needs as
+/// `task_id`. Chronos users type/see the `ticket` value, never the `id` —
+/// see sync.ts's `resolveTaskId` for where the lookup from one to the
+/// other happens.
+fn normalize_task_item(item: &Value) -> Value {
+    json!({
+        "id": stringify_id(item.get("id")),
+        "title": item.get("title").and_then(Value::as_str).unwrap_or("").to_string(),
+        "ticket": stringify_id(item.get("ticket")),
     })
 }
 

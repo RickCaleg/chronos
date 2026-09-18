@@ -8,6 +8,16 @@ export interface RemoteItem {
   title: string;
 }
 
+/**
+ * A ProofHub task has two distinct identifiers: `ticket` (the small,
+ * sequential "#1234"-style number the UI shows and users actually see/type)
+ * and `id` (a large opaque internal id the API needs for `task_id`). See
+ * sync.ts's `resolveTaskId` for the lookup from one to the other.
+ */
+export interface RemoteTask extends RemoteItem {
+  ticket: string;
+}
+
 interface PluginStatus {
   installed: boolean;
   version: string | null;
@@ -35,6 +45,7 @@ interface ProofHubState {
   remoteProjects: RemoteItem[] | null;
   timesheetsByProject: Record<string, RemoteItem[]>;
   todolistsByProject: Record<string, RemoteItem[]>;
+  tasksByTodolist: Record<string, RemoteTask[]>;
 
   load: () => Promise<void>;
   install: () => Promise<void>;
@@ -49,6 +60,7 @@ interface ProofHubState {
   loadRemoteProjects: (force?: boolean) => Promise<RemoteItem[]>;
   loadTimesheets: (proofhubProjectId: string, force?: boolean) => Promise<RemoteItem[]>;
   loadTodolists: (proofhubProjectId: string, force?: boolean) => Promise<RemoteItem[]>;
+  loadTasks: (proofhubProjectId: string, todolistId: string, force?: boolean) => Promise<RemoteTask[]>;
 }
 
 export const useProofHubStore = create<ProofHubState>((set, get) => ({
@@ -63,6 +75,7 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
   remoteProjects: null,
   timesheetsByProject: {},
   todolistsByProject: {},
+  tasksByTodolist: {},
 
   load: async () => {
     const [status, subdomain, projectMap, groupPushesByDay] = await Promise.all([
@@ -98,7 +111,7 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
     set({ busy: true, error: null });
     try {
       await invoke("proofhub_plugin_uninstall");
-      set({ remoteProjects: null, timesheetsByProject: {}, todolistsByProject: {} });
+      set({ remoteProjects: null, timesheetsByProject: {}, todolistsByProject: {}, tasksByTodolist: {} });
       await get().load();
     } finally {
       set({ busy: false });
@@ -123,7 +136,7 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
 
   disconnect: async () => {
     await invoke("proofhub_clear_credentials");
-    set({ remoteProjects: null, timesheetsByProject: {}, todolistsByProject: {} });
+    set({ remoteProjects: null, timesheetsByProject: {}, todolistsByProject: {}, tasksByTodolist: {} });
     await get().load();
   },
 
@@ -166,5 +179,13 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
     const todolists = await get().call<RemoteItem[]>("list-todolists", { projectId: proofhubProjectId });
     set((state) => ({ todolistsByProject: { ...state.todolistsByProject, [proofhubProjectId]: todolists } }));
     return todolists;
+  },
+
+  loadTasks: async (proofhubProjectId, todolistId, force = false) => {
+    const cached = get().tasksByTodolist[todolistId];
+    if (cached && !force) return cached;
+    const tasks = await get().call<RemoteTask[]>("list-tasks", { projectId: proofhubProjectId, todolistId });
+    set((state) => ({ tasksByTodolist: { ...state.tasksByTodolist, [todolistId]: tasks } }));
+    return tasks;
   },
 }));

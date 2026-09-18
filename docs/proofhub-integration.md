@@ -429,7 +429,7 @@ two keyed by ProofHub project id) and only refetches on an explicit
 | Duration | `logged_hours` + `logged_mins` | Converted from `duration_seconds`. |
 | Entry's calendar day | `date` | `YYYY-MM-DD`, from the entry's local start time. |
 | (mapping's default) | `status` (billable/none) | Per-project default, overridable per push. |
-| Task number (optional) | `task_id` (+ mapping's `list_id`) | **Per-entry, not per-project**: if the entry has a `taskNumber` (e.g. `#1234`) *and* the project mapping has a default task list configured, the number (stripped of its `#`) is sent as `task_id` alongside that list's id. Either one missing just logs at the project/timesheet level — task-level linking is never required for a push to succeed. Chronos doesn't validate that the number is actually a real ProofHub task id in that list; a bad one is ProofHub's `4xx` to reject (§9). |
+| Task number (optional) | `task_id` (+ mapping's `list_id`) | **Per-entry, not per-project, and resolved, not passed through directly.** ProofHub tasks have two distinct identifiers — `ticket` (the small, sequential "#1234"-style number the UI shows and Chronos users type as `taskNumber`) and `id` (a large opaque internal id, unrelated to `ticket`, that the API actually needs as `task_id`; confirmed against `api_v3/sections/tasks.md` and ProofHub's own help center). If the entry has a `taskNumber` *and* the project mapping has a default task list configured, `sync.ts`'s `resolveTaskId` lists that task list (cached) and looks up the task whose `ticket` matches, using **its** `id` as `task_id`. Either one missing (no task list configured, or no task number on the entry) just logs at the project/timesheet level, silently — that's the normal case for users not using task-level linking. But if both are set and the ticket doesn't match any task in that list, the push **fails loudly** (no partial/project-level log) rather than degrading silently — see §9. |
 
 ## 8. Push UX
 
@@ -504,11 +504,21 @@ control." Revisit only if real usage shows people want it.
 checked the HTTP status code. ProofHub signals at least some failures (a
 bad API key, confirmed) with an HTTP **200** and `{"success": false,
 "status": false, "message": "..."}` in the body, not a non-2xx status —
-meaning those responses were silently treated as full successes. This is
-the leading suspect for "the push worked but the task link didn't happen"
-reports: a rejected/invalid `task_id` plausibly comes back the same way.
-Fixed by also checking `body.success`/`body.status` for an explicit
-`false` before treating a response as `Ok`.
+meaning those responses were silently treated as full successes. Fixed by
+also checking `body.success`/`body.status` for an explicit `false` before
+treating a response as `Ok`.
+
+**Found and fixed the actual root cause of "correctly configured, push
+succeeded, task link still didn't happen":** confirmed via a real report,
+verified against the API docs + ProofHub's help center. `taskNumber` (the
+`#1234`-style value Chronos users type, matching what ProofHub's UI
+displays) is ProofHub's `ticket` field — a small, sequential, per-account
+display number. It is **not** the `id` field the API needs for `task_id`;
+`id` is a large, unrelated internal identifier. Sending `ticket` as
+`task_id` directly (the original implementation) meant ProofHub could
+never find a matching task, silently degrading to project-level logging.
+Fixed by resolving `ticket` → `id` before every push (§7's updated table
+row) instead of passing the typed number straight through.
 
 ### 9.1 The debug log
 
@@ -577,9 +587,14 @@ ask), targeting v0.5.0:**
   a Chronos project maps to many different ProofHub tasks over time via
   each entry's own task number, not one fixed task) to the per-entry model
   in §7's table: a project mapping optionally names a default task list,
-  and each pushed entry supplies its own task id via `taskNumber`. Dropped
-  the `list-tasks` plugin action and the per-project task `<Select>`
-  entirely along with it — nothing left to browse.
+  and each pushed entry supplies its own task id via `taskNumber`. Initially
+  dropped the `list-tasks` plugin action and the per-project task
+  `<Select>` entirely as part of that ("nothing left to browse"), then
+  **brought `list-tasks` back** once a real push-with-linking report
+  revealed `taskNumber` can't be sent to the API directly — see §7's
+  updated row and §9's `ticket`-vs-`id` note. It's used internally now
+  (`resolveTaskId` in `sync.ts`, cached the same way the other remote
+  lists are), not re-exposed as a picker.
 - Also dropped the "create a timesheet" convenience button per the same
   feedback: real ProofHub users always already have one to pick from, so
   `create-timesheet` was removed from the plugin binary too.
