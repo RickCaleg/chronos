@@ -687,7 +687,7 @@ dependencies = [
 
 [[package]]
 name = "chronos"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "aes-gcm",
  "libsqlite3-sys",
@@ -705,13 +705,14 @@ dependencies = [
  "tauri-plugin-global-shortcut",
  "tauri-plugin-opener",
  "tauri-plugin-process",
+ "tauri-plugin-single-instance",
  "tauri-plugin-sql",
  "tauri-plugin-updater",
 ]
 
 [[package]]
 name = "chronos-cli"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "anyhow",
  "chrono",
@@ -727,7 +728,7 @@ dependencies = [
 
 [[package]]
 name = "chronos-proofhub-plugin"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "reqwest 0.12.28",
  "serde",
@@ -5452,6 +5453,22 @@ checksum = "d55511a7bf6cd70c8767b02c97bf8134fa434daf3926cfc1be0a0f94132d165a"
 dependencies = [
  "tauri",
  "tauri-plugin",
+]
+
+[[package]]
+name = "tauri-plugin-single-instance"
+version = "2.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5cd0cb5c412a5071b69bab6a6df1583cbb89460d4a83b6a24769b08d15b6b1e1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "windows-sys 0.60.2",
+ "zbus",
 ]
 
 [[package]]

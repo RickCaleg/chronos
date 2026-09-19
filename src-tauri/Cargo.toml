@@ -1,6 +1,6 @@
 [package]
 name = "chronos"
-version = "0.5.5"
+version = "0.5.6"
 description = "A manual, local-first time tracker built with Tauri and React."
 authors = ["Richardson Calegari Saconi"]
 license = "MIT"
@@ -39,6 +39,7 @@ tauri-plugin-updater = "2.11.0"
 tauri-plugin-process = "2.3.1"
 tauri-plugin-global-shortcut = "2.3.2"
 tauri-plugin-autostart = "2.5.1"
+tauri-plugin-single-instance = "2"
 
 # ProofHub integration (docs/proofhub-integration.md): downloading and
 # signature-verifying the separate chronos-proofhub-plugin binary, and

@@ -5,6 +5,11 @@ All notable changes to Chronos are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-09-19
+### Fixed
+- Every launch opened a new Chronos instance with its own tray icon, piling up on Linux (seen on Omarchy). Only one instance runs now; launching it again just brings the existing window to the front (the autostart's `--minimized` launch stays hidden).
+- AppImage looking too small on Omarchy/Hyprland with a fractional monitor scale (e.g. 1.6). Omarchy leaves XWayland unscaled and relies on the integer `GDK_SCALE`, which the 0.3.3 fix stripped. On Hyprland with `xwayland:force_zero_scaling`, `GDK_SCALE` is now kept and the fractional remainder (monitor scale ÷ `GDK_SCALE`) is applied as webview zoom.
+
 ## [0.5.5] - 2026-09-18
 ### Changed
 - Reworked ProofHub sending around one consistent model (see `docs/proofhub-integration.md` §8). Each row and each day's button send whatever isn't in ProofHub yet, and with "group pushes by day" on, a group is always sent with its full total.

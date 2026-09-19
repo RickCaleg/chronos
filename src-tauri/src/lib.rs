@@ -183,24 +183,88 @@ fn migrations() -> Vec<Migration> {
     ]
 }
 
+/// Runs `hyprctl <args> -j` and parses its JSON output.
+#[cfg(target_os = "linux")]
+fn hyprctl_json(args: &[&str]) -> Option<serde_json::Value> {
+    let output = Command::new("hyprctl").args(args).arg("-j").output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    serde_json::from_slice(&output.stdout).ok()
+}
+
+/// Under Hyprland with `xwayland:force_zero_scaling` on (Omarchy's default),
+/// XWayland clients are *not* scaled by the compositor: they draw at 1x and
+/// rely on `GDK_SCALE` for HiDPI. That variable is an integer though, while
+/// the monitor's scale is usually fractional (Omarchy pairs `scale = 1.6`
+/// with `GDK_SCALE=2`), so the app ends up at the rounded-up size. Returns
+/// the webview zoom that closes that gap (`1.6 / 2 = 0.8`), or `None` when
+/// this isn't such a setup.
+#[cfg(target_os = "linux")]
+fn hyprland_unscaled_xwayland_zoom() -> Option<f64> {
+    std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE")?;
+
+    let force_zero = hyprctl_json(&["getoption", "xwayland:force_zero_scaling"])?;
+    let force_zero = force_zero["bool"].as_bool().or_else(|| force_zero["int"].as_i64().map(|v| v != 0));
+    if force_zero != Some(true) {
+        return None;
+    }
+
+    let monitors = hyprctl_json(&["monitors"])?;
+    let monitors = monitors.as_array()?;
+    let monitor = monitors
+        .iter()
+        .find(|m| m["focused"].as_bool() == Some(true))
+        .or_else(|| monitors.first())?;
+    let monitor_scale = monitor["scale"].as_f64()?;
+
+    let gdk_scale = std::env::var("GDK_SCALE")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|v| *v >= 1.0)
+        .unwrap_or(1.0);
+    Some((monitor_scale / gdk_scale).clamp(0.5, 4.0))
+}
+
 /// Our AppImage bundle (via linuxdeploy-plugin-gtk) forces `GDK_BACKEND=x11`
 /// to dodge an unrelated Wayland webview crash (tauri-apps/tauri#8541), which
 /// runs the app under XWayland instead of natively. `GDK_SCALE` is meant for
-/// *native* Wayland/X11 sessions (e.g. `GDK_SCALE=2` on this desktop's
-/// fractional-scaled HiDPI panel); under XWayland it stacks with the
-/// compositor's own auto-scaling for non-Wayland-native clients, roughly
-/// doubling the UI size. Only strip it when that x11 override is in effect —
-/// native .deb/.rpm installs run under real Wayland and size correctly.
+/// *native* Wayland/X11 sessions; under an XWayland that the compositor
+/// auto-scales it stacks with that scaling and roughly doubles the UI size,
+/// so it's stripped by default when the x11 override is in effect (native
+/// .deb/.rpm installs run under real Wayland and size correctly).
+///
+/// The exception is a compositor that leaves XWayland unscaled (Hyprland with
+/// `force_zero_scaling`, i.e. Omarchy): there `GDK_SCALE` is the only HiDPI
+/// hook, so it's kept and the fractional remainder is returned as a webview
+/// zoom for `setup` to apply.
 #[cfg(target_os = "linux")]
-fn fix_appimage_x11_scaling() {
-    if std::env::var("GDK_BACKEND").as_deref() == Ok("x11") {
-        std::env::remove_var("GDK_SCALE");
-        std::env::remove_var("GDK_DPI_SCALE");
+fn fix_appimage_x11_scaling() -> Option<f64> {
+    if std::env::var("GDK_BACKEND").as_deref() != Ok("x11") {
+        return None;
     }
+    if let Some(zoom) = hyprland_unscaled_xwayland_zoom() {
+        return Some(zoom);
+    }
+    std::env::remove_var("GDK_SCALE");
+    std::env::remove_var("GDK_DPI_SCALE");
+    None
 }
 
 #[cfg(not(target_os = "linux"))]
-fn fix_appimage_x11_scaling() {}
+fn fix_appimage_x11_scaling() -> Option<f64> {
+    None
+}
+
+/// Brings the main window to the front — used by the tray and by a second
+/// launch of the app being redirected to this instance.
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
 
 /// makepkg injects RUSTFLAGS (-C force-frame-pointers=yes -C debuginfo=2
 /// --remap-path-prefix=..., for its automatic debug-package splitting) and
@@ -214,7 +278,7 @@ fn fix_appimage_x11_scaling() {}
 /// which unsets those variables for its build steps.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    fix_appimage_x11_scaling();
+    let webview_zoom = fix_appimage_x11_scaling();
 
     // The autostart plugin always launches with this flag; setup() below
     // uses it to decide whether to reveal the window immediately or leave it
@@ -222,6 +286,16 @@ pub fn run() {
     let start_minimized = std::env::args().any(|arg| arg == "--minimized");
 
     tauri::Builder::default()
+        // Must be the first plugin. Without it every launch (e.g. from the app
+        // launcher while Chronos sits in the tray) starts a whole new instance
+        // with its own tray icon. A second launch is forwarded here instead
+        // and just reveals the window — unless it's the autostart's
+        // `--minimized` launch, which should stay out of the way.
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if !args.iter().any(|arg| arg == "--minimized") {
+                show_main_window(app);
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -290,12 +364,7 @@ pub fn run() {
                 tray = tray.icon(icon.clone());
             }
             tray.on_menu_event(|app, event| match event.id().as_ref() {
-                "show" => {
-                    if let Some(window) = app.get_webview_window("main") {
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                    }
-                }
+                "show" => show_main_window(app),
                 "toggle_timer" => {
                     let _ = app.emit("toggle-timer-shortcut", ());
                 }
@@ -309,16 +378,15 @@ pub fn run() {
                 if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } =
                     event
                 {
-                    let app = tray.app_handle();
-                    if let Some(window) = app.get_webview_window("main") {
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                    }
+                    show_main_window(tray.app_handle());
                 }
             })
             .build(app)?;
 
             if let Some(window) = app.get_webview_window("main") {
+                if let Some(zoom) = webview_zoom.filter(|z| (z - 1.0).abs() > 0.01) {
+                    let _ = window.set_zoom(zoom);
+                }
                 if should_hide_decorations() {
                     window.set_decorations(false)?;
                 }
