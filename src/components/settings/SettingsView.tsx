@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Download, FileSpreadsheet, FolderOpen, RefreshCw, Save, Trash2, Upload } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -166,46 +166,56 @@ export function SettingsView() {
     <div className="mx-auto h-full max-w-xl overflow-y-auto py-2">
       <h1 className="mb-4 text-lg font-semibold">{t("settings.title")}</h1>
 
-      <section className="mb-6 rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-        <h2 className="mb-3 text-sm font-medium">{t("settings.language")}</h2>
-        <div className="flex flex-wrap gap-2">
-          {SUPPORTED_LANGUAGES.map((lng) => (
-            <button
-              key={lng}
-              onClick={() => i18n.changeLanguage(lng)}
-              className={cn(
-                "rounded-[2px] border px-3 py-1.5 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]",
-                i18n.language === lng
-                  ? "border-[var(--color-accent)] text-[var(--color-accent)]"
-                  : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)]",
-              )}
-            >
-              {LANGUAGE_LABELS[lng]}
-            </button>
-          ))}
+      <GroupHeading>{t("settings.groupAppearance")}</GroupHeading>
+      <section className="mb-6 divide-y divide-[var(--color-border)] rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)]">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+          <p className="text-sm">{t("settings.language")}</p>
+          <div className="flex flex-wrap gap-2">
+            {SUPPORTED_LANGUAGES.map((lng) => (
+              <button
+                key={lng}
+                onClick={() => i18n.changeLanguage(lng)}
+                className={cn(
+                  "rounded-[2px] border px-3 py-1.5 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]",
+                  i18n.language === lng
+                    ? "border-[var(--color-accent)] text-[var(--color-accent)]"
+                    : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)]",
+                )}
+              >
+                {LANGUAGE_LABELS[lng]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+          <p className="text-sm">{t("settings.theme")}</p>
+          <div className="flex flex-wrap gap-2">
+            {themeOptions.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setTheme(opt.value)}
+                className={cn(
+                  "rounded-[2px] border px-3 py-1.5 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]",
+                  theme === opt.value
+                    ? "border-[var(--color-accent)] text-[var(--color-accent)]"
+                    : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)]",
+                )}
+              >
+                {t(opt.labelKey)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-4 p-4">
+          <div>
+            <p className="text-sm">{t("settings.groupSimilar")}</p>
+            <p className="text-xs text-[var(--color-text-muted)]">{t("settings.groupSimilarDescription")}</p>
+          </div>
+          <Switch checked={groupSimilarEntries} onChange={setGroupSimilarEntries} label={t("settings.groupSimilar")} />
         </div>
       </section>
 
-      <section className="mb-6 rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-        <h2 className="mb-3 text-sm font-medium">{t("settings.theme")}</h2>
-        <div className="flex flex-wrap gap-2">
-          {themeOptions.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setTheme(opt.value)}
-              className={cn(
-                "rounded-[2px] border px-3 py-1.5 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]",
-                theme === opt.value
-                  ? "border-[var(--color-accent)] text-[var(--color-accent)]"
-                  : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)]",
-              )}
-            >
-              {t(opt.labelKey)}
-            </button>
-          ))}
-        </div>
-      </section>
-
+      <GroupHeading>{t("settings.groupSystem")}</GroupHeading>
       <section className="mb-6 rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
         <h2 className="mb-3 text-sm font-medium">{t("settings.startupTitle")}</h2>
 
@@ -233,21 +243,6 @@ export function SettingsView() {
             </Button>
           </div>
           {shortcutStatus && <p className="mt-2 text-sm">{shortcutStatus}</p>}
-        </div>
-      </section>
-
-      <Suspense fallback={null}>
-        <ProofHubSettings />
-      </Suspense>
-
-      <section className="mb-6 rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-        <h2 className="mb-3 text-sm font-medium">{t("settings.display")}</h2>
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm">{t("settings.groupSimilar")}</p>
-            <p className="text-xs text-[var(--color-text-muted)]">{t("settings.groupSimilarDescription")}</p>
-          </div>
-          <Switch checked={groupSimilarEntries} onChange={setGroupSimilarEntries} label={t("settings.groupSimilar")} />
         </div>
       </section>
 
@@ -330,6 +325,12 @@ export function SettingsView() {
         )}
       </section>
 
+      <GroupHeading>{t("settings.groupIntegrations")}</GroupHeading>
+      <Suspense fallback={null}>
+        <ProofHubSettings />
+      </Suspense>
+
+      <GroupHeading>{t("settings.groupData")}</GroupHeading>
       <section className="mb-6 rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
         <h2 className="mb-1 text-sm font-medium">{t("settings.dataTitle")}</h2>
         <p className="mb-4 text-xs text-[var(--color-text-muted)]">{t("settings.dataDescription")}</p>
@@ -475,5 +476,12 @@ export function SettingsView() {
         </Button>
       </section>
     </div>
+  );
+}
+
+/** Labels a run of related settings cards, so the page reads as a few groups instead of a long list. */
+function GroupHeading({ children }: { children: ReactNode }) {
+  return (
+    <h2 className="mb-2 mt-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">{children}</h2>
   );
 }

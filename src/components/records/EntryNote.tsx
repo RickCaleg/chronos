@@ -4,9 +4,8 @@ import { NotebookPen } from "lucide-react";
 import type { TimeEntry } from "../../types";
 import { useEntriesStore } from "../../store/useEntriesStore";
 import { cn } from "../../lib/cn";
+import { revealOnRowHover, rowIconButton } from "./rowStyles";
 
-const iconButtonClass =
-  "shrink-0 rounded-[2px] p-1.5 text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-border)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)]";
 
 /**
  * What a set of entries (one row, or a whole group) has as its note: the
@@ -31,7 +30,8 @@ export function NoteButton({ entries, onClick }: { entries: TimeEntry[]; onClick
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={cn(iconButtonClass, hasNote && "text-[var(--color-accent)]")}
+      // With a note it's state worth seeing; without one, just an action.
+      className={cn(rowIconButton, hasNote ? "text-[var(--color-accent)]" : revealOnRowHover)}
     >
       <NotebookPen size={14} />
     </button>

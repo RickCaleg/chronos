@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { useTranslation } from "react-i18next";
 import {
   Clock,
+  ClockPlus,
   Download,
   FolderKanban,
   FolderPlus,
@@ -18,6 +19,7 @@ import { useUpdaterStore } from "../store/useUpdaterStore";
 import { exportJsonBackup, importJsonBackup } from "../lib/exportImport";
 import { nowIso } from "../lib/time";
 import { discardRunningTimer } from "./timer/discardTimer";
+import { useManualEntryStore } from "./timer/ManualEntry";
 import { cn } from "../lib/cn";
 
 interface Command {
@@ -67,6 +69,15 @@ export function CommandPalette({ open, onClose, onNavigate }: CommandPaletteProp
       });
     }
     list.push(
+      {
+        id: "manual-entry",
+        labelKey: "palette.manualEntry",
+        icon: ClockPlus,
+        run: () => {
+          onNavigate("timer");
+          useManualEntryStore.getState().setOpen(true);
+        },
+      },
       { id: "go-timer", labelKey: "palette.goTimer", icon: Clock, run: () => onNavigate("timer") },
       { id: "go-projects", labelKey: "palette.goProjects", icon: FolderKanban, run: () => onNavigate("projects") },
       { id: "new-project", labelKey: "palette.newProject", icon: FolderPlus, run: () => onNavigate("projects") },

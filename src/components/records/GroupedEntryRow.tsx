@@ -8,13 +8,12 @@ import { EntryRow } from "./EntryRow";
 import { RestartButton } from "./RestartButton";
 import { EntryNote, NoteButton } from "./EntryNote";
 import { GroupEditPopover } from "./GroupEditPopover";
+import { revealOnRowHover, rowIconButton } from "./rowStyles";
 import { formatDurationHuman } from "../../lib/time";
 import { projectLabel } from "../../lib/projectLabel";
 import { cn } from "../../lib/cn";
 import { SyncBadge } from "../../integrations/proofhub/SyncBadge";
 
-const iconButtonClass =
-  "shrink-0 rounded-[2px] p-1.5 text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-border)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)]";
 
 export function GroupedEntryRow({ entries }: { entries: TimeEntry[] }) {
   const { t } = useTranslation();
@@ -111,9 +110,17 @@ export function GroupedEntryRow({ entries }: { entries: TimeEntry[] }) {
           {/* Acts on every ProofHub unit in the group: one with "group pushes by day" on, one per entry otherwise. */}
           <SyncBadge entries={entries} />
 
-          <button type="button" onClick={handleCopy} aria-label={t("records.copy")} className={iconButtonClass}>
+          <button
+            type="button"
+            onClick={handleCopy}
+            aria-label={t("records.copy")}
+            title={t("records.copy")}
+            className={cn(rowIconButton, !copied && revealOnRowHover)}
+          >
             {copied ? <Check size={14} className="text-[var(--color-accent)]" /> : <Copy size={14} />}
           </button>
+          {/* Where a single entry has its delete button, so durations line up across rows. */}
+          <span aria-hidden className="w-[26px] shrink-0" />
         </div>
 
         {/* Play, chevron and paddings: 66px to the description text. */}

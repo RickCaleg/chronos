@@ -17,6 +17,8 @@ interface EntriesState {
   loaded: boolean;
   load: () => Promise<void>;
   start: (input: entriesDb.StartEntryInput) => Promise<void>;
+  /** Adds a finished entry by hand; the running timer, if any, is untouched. */
+  add: (input: entriesDb.AddEntryInput, tags: Tag[]) => Promise<void>;
   stop: () => Promise<void>;
   /** Stops the running timer without keeping it: the entry is deleted. */
   discard: () => Promise<void>;
@@ -42,6 +44,19 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
     const entry = await entriesDb.startEntry(input);
     set({ entries: [entry, ...get().entries], runningEntry: entry });
     syncTrayLabel(true);
+  },
+
+  add: async (input, tags) => {
+    const entry = await entriesDb.addEntry(input);
+    if (tags.length > 0) {
+      await tagsDb.setEntryTags(
+        entry.id,
+        tags.map((t) => t.id),
+      );
+    }
+    const added = { ...entry, tags };
+    // Kept newest-first, like listEntries.
+    set({ entries: [...get().entries, added].sort((a, b) => (a.startTime < b.startTime ? 1 : -1)) });
   },
 
   stop: async () => {

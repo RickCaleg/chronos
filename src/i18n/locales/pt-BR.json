@@ -18,7 +18,10 @@
     "exportBackup": "Exportar backup completo (JSON)",
     "importBackup": "Importar backup (JSON)",
     "checkUpdates": "Verificar atualizações",
-    "discardTimer": "Descartar timer (sem salvar)"
+    "discardTimer": "Descartar timer (sem salvar)",
+    "manualEntry": "Incluir lançamento manual",
+    "open": "Comandos",
+    "hint": "Todas as ações pelo teclado (Ctrl+K)"
   },
   "timer": {
     "combinedPlaceholder": "No que você está trabalhando? Digite # para número da task",
@@ -28,7 +31,9 @@
     "editStart": "Editar hora de início",
     "runningSince": "Rodando desde {{time}}",
     "discard": "Descartar timer",
-    "discardConfirm": "Descartar \"{{description}}\"? Os {{elapsed}} registrados não serão salvos."
+    "discardConfirm": "Descartar \"{{description}}\"? Os {{elapsed}} registrados não serão salvos.",
+    "manualEntry": "Incluir lançamento manual",
+    "manualEntryShort": "Lançamento manual"
   },
   "records": {
     "empty": "Nenhum registro ainda. Inicie o timer para criar o primeiro.",
@@ -54,7 +59,8 @@
     "groupEditHint": "As alterações valem para os {{count}} lançamentos do grupo. Os horários são de cada lançamento — abra o grupo para mudá-los.",
     "groupTagsHint": "Tags que só alguns lançamentos têm não aparecem aqui e são mantidas. O que você adicionar ou remover vale para todos.",
     "deleteGroup": "Excluir os {{count}}",
-    "deleteGroupConfirm": "Excluir os {{count}} lançamentos deste grupo?"
+    "deleteGroupConfirm": "Excluir os {{count}} lançamentos deste grupo?",
+    "thisWeek": "Semana"
   },
   "editor": {
     "taskDescription": "Task e descrição",
@@ -71,7 +77,9 @@
     "futureStart": "O início não pode ser no futuro",
     "invalidDateTime": "Use aaaa-MM-dd HH:mm:ss, ou apenas HH:mm para manter a mesma data",
     "invalidDuration": "Use HH:mm:ss, HH:mm ou minutos",
-    "dateTimePlaceholder": "aaaa-MM-dd HH:mm:ss"
+    "dateTimePlaceholder": "aaaa-MM-dd HH:mm:ss",
+    "newEntry": "Novo lançamento",
+    "add": "Adicionar"
   },
   "projects": {
     "title": "Projetos",
@@ -156,7 +164,11 @@
     "resetAll": "Começar do zero (apagar todos os dados)",
     "resetAllDescription": "Apaga permanentemente todos os projetos e registros de tempo deste dispositivo. Não pode ser desfeito.",
     "resetConfirm": "Excluir todos os projetos e registros de tempo? Isso não pode ser desfeito.",
-    "resetSuccess": "Todos os dados foram apagados"
+    "resetSuccess": "Todos os dados foram apagados",
+    "groupAppearance": "Aparência",
+    "groupSystem": "Sistema",
+    "groupIntegrations": "Integrações",
+    "groupData": "Dados e backup"
   },
   "common": {
     "cancel": "Cancelar",
@@ -223,7 +235,7 @@
     "checkDay": "Verificar no ProofHub se algo foi apagado ou alterado lá",
     "checkFailure": "Não foi possível verificar no ProofHub: {{message}}",
     "sendDayChangedConfirm": "Enviar {{count}} lançamentos ({{hours}} no total) para o ProofHub? {{changed}} deles foram alterados no ProofHub e serão sobrescritos.",
-    "checkSent": "Verificar lançamentos enviados",
+    "checkSent": "Verificar",
     "checkSentDescription": "Compara os últimos {{days}} dias nos dois sentidos: marca o que você enviou e foi apagado ou alterado no ProofHub, e lista os seus lançamentos no ProofHub que não vieram do Chronos.",
     "checkSentFound": "Encontrado no ProofHub: {{missing}} apagados, {{changed}} alterados. Estão marcados na aba do timer.",
     "checkSentNothing": "Os {{count}} lançamentos enviados continuam no ProofHub como foram enviados.",
@@ -233,7 +245,22 @@
     "remoteOnlyNone": "Nada no ProofHub que não esteja no Chronos.",
     "remoteOnlyOnTask": "(lançado numa task, sem descrição)",
     "remoteOnlyDelete": "Apagar no ProofHub",
-    "remoteOnlyDeleteConfirm": "Apagar o lançamento do ProofHub de {{date}} ({{hours}})? Não dá para desfazer pelo Chronos."
+    "remoteOnlyDeleteConfirm": "Apagar o lançamento do ProofHub de {{date}} ({{hours}})? Não dá para desfazer pelo Chronos.",
+    "sendCount": "Enviar {{count}}",
+    "daySent": "Enviado",
+    "dayProblems": "{{count}} apagados ou alterados no ProofHub",
+    "sendsTitle": "Envios",
+    "projectMappingsDescription": "Para qual projeto e timesheet do ProofHub vão as horas de cada projeto do Chronos. Projetos sem mapeamento nunca são enviados.",
+    "optionsTitle": "Opções",
+    "loadingProjects": "Carregando projetos do ProofHub…",
+    "notMapped": "não enviado ao ProofHub",
+    "nothingPending": "Tudo dos últimos 30 dias está no ProofHub.",
+    "pendingSummary": "{{count}} para enviar ({{hours}})",
+    "unitsCount": "{{count}} lançamentos",
+    "sendAll": "Enviar tudo",
+    "sendAllConfirm": "Enviar {{count}} lançamentos de {{days}} dias ({{hours}} no total) para o ProofHub?",
+    "disconnectConfirm": "Desconectar do ProofHub? A chave de API é removida deste computador; os mapeamentos e o que já foi enviado são mantidos.",
+    "pendingSummaryShort": "{{count}} para enviar ao ProofHub"
   },
   "confirm": {
     "ok": "OK"

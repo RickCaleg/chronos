@@ -3,6 +3,8 @@ import { Clock, FolderKanban, Plug, Settings } from "lucide-react";
 import { cn } from "../lib/cn";
 import { useUpdaterStore } from "../store/useUpdaterStore";
 import { useProofHubStore } from "../integrations/proofhub/useProofHubStore";
+import { useSyncPlan } from "../integrations/proofhub/sync";
+import { dayKey } from "../lib/time";
 
 export type View = "timer" | "projects" | "settings" | "proofhub";
 
@@ -19,6 +21,11 @@ export function TopNav({ current, onChange }: { current: View; onChange: (v: Vie
   // Only shown once the plugin is installed — see docs/proofhub-integration.md
   // section 6 on keeping this invisible until the user opts in.
   const proofhubInstalled = useProofHubStore((s) => s.installed);
+  // What's left to send (or resend) from the last 30 days, the same window
+  // the ProofHub tab lists — visible from every screen.
+  const plan = useSyncPlan();
+  const since = dayKey(new Date(Date.now() - 30 * 86_400_000).toISOString());
+  const proofhubPending = plan.units.filter((u) => u.status !== "synced" && u.day >= since).length;
   const items = proofhubInstalled
     ? [...BASE_ITEMS, { view: "proofhub" as View, icon: Plug, labelKey: "nav.proofhub" }]
     : BASE_ITEMS;
@@ -38,6 +45,14 @@ export function TopNav({ current, onChange }: { current: View; onChange: (v: Vie
         >
           <Icon size={15} />
           <span className="hidden sm:inline">{t(labelKey)}</span>
+          {view === "proofhub" && proofhubPending > 0 && (
+            <span
+              className="rounded-full bg-[color-mix(in_srgb,var(--color-accent)_16%,transparent)] px-1.5 text-[10px] font-semibold tabular-nums text-[var(--color-accent)]"
+              title={t("proofhub.pendingSummaryShort", { count: proofhubPending })}
+            >
+              {proofhubPending}
+            </span>
+          )}
           {view === "settings" && updateAvailable && (
             <span className="absolute right-1 top-1.5 h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" />
           )}

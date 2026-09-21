@@ -18,7 +18,10 @@
     "exportBackup": "Export full backup (JSON)",
     "importBackup": "Import backup (JSON)",
     "checkUpdates": "Check for updates",
-    "discardTimer": "Discard timer (don't save)"
+    "discardTimer": "Discard timer (don't save)",
+    "manualEntry": "Add an entry by hand",
+    "open": "Commands",
+    "hint": "Every action, from the keyboard (Ctrl+K)"
   },
   "timer": {
     "combinedPlaceholder": "What are you working on? Type # for a task number",
@@ -28,7 +31,9 @@
     "editStart": "Edit start time",
     "runningSince": "Running since {{time}}",
     "discard": "Discard timer",
-    "discardConfirm": "Discard \"{{description}}\"? Its {{elapsed}} won't be saved."
+    "discardConfirm": "Discard \"{{description}}\"? Its {{elapsed}} won't be saved.",
+    "manualEntry": "Add an entry by hand",
+    "manualEntryShort": "Manual entry"
   },
   "records": {
     "empty": "No time entries yet. Start the timer to create your first one.",
@@ -54,7 +59,8 @@
     "groupEditHint": "Changes apply to all {{count}} entries in this group. Times stay per entry — expand the group to change them.",
     "groupTagsHint": "Tags only some entries have aren't shown; they're kept. What you add or remove here applies to all.",
     "deleteGroup": "Delete all {{count}}",
-    "deleteGroupConfirm": "Delete all {{count}} entries in this group?"
+    "deleteGroupConfirm": "Delete all {{count}} entries in this group?",
+    "thisWeek": "This week"
   },
   "editor": {
     "taskDescription": "Task & description",
@@ -71,7 +77,9 @@
     "futureStart": "Start can't be in the future",
     "invalidDateTime": "Use yyyy-MM-dd HH:mm:ss, or just HH:mm to keep the same date",
     "invalidDuration": "Use HH:mm:ss, HH:mm, or minutes",
-    "dateTimePlaceholder": "yyyy-MM-dd HH:mm:ss"
+    "dateTimePlaceholder": "yyyy-MM-dd HH:mm:ss",
+    "newEntry": "New entry",
+    "add": "Add"
   },
   "projects": {
     "title": "Projects",
@@ -156,7 +164,11 @@
     "resetAll": "Start fresh (erase all data)",
     "resetAllDescription": "Permanently deletes every project and time entry on this device. This cannot be undone.",
     "resetConfirm": "Delete all projects and time entries? This cannot be undone.",
-    "resetSuccess": "All data was erased"
+    "resetSuccess": "All data was erased",
+    "groupAppearance": "Appearance",
+    "groupSystem": "System",
+    "groupIntegrations": "Integrations",
+    "groupData": "Data and backup"
   },
   "common": {
     "cancel": "Cancel",
@@ -223,7 +235,7 @@
     "checkDay": "Check ProofHub for entries deleted or changed there",
     "checkFailure": "Couldn't check ProofHub: {{message}}",
     "sendDayChangedConfirm": "Send {{count}} ProofHub entries ({{hours}} in total)? {{changed}} of them were changed in ProofHub and will be overwritten.",
-    "checkSent": "Check sent entries",
+    "checkSent": "Check",
     "checkSentDescription": "Compares the last {{days}} days both ways: marks what you sent that was deleted or changed in ProofHub, and lists your ProofHub entries that Chronos didn't send.",
     "checkSentFound": "Found in ProofHub: {{missing}} deleted, {{changed}} changed. They're marked in the timer tab.",
     "checkSentNothing": "All {{count}} sent entries are still in ProofHub as sent.",
@@ -233,7 +245,22 @@
     "remoteOnlyNone": "Nothing in ProofHub that isn't in Chronos.",
     "remoteOnlyOnTask": "(logged on a task, no description)",
     "remoteOnlyDelete": "Delete in ProofHub",
-    "remoteOnlyDeleteConfirm": "Delete the ProofHub entry of {{date}} ({{hours}})? This can't be undone in Chronos."
+    "remoteOnlyDeleteConfirm": "Delete the ProofHub entry of {{date}} ({{hours}})? This can't be undone in Chronos.",
+    "sendCount": "Send {{count}}",
+    "daySent": "Sent",
+    "dayProblems": "{{count}} deleted or changed in ProofHub",
+    "sendsTitle": "Sending",
+    "projectMappingsDescription": "Which ProofHub project and timesheet each Chronos project's hours go to. Unmapped projects are never sent.",
+    "optionsTitle": "Options",
+    "loadingProjects": "Loading ProofHub projects…",
+    "notMapped": "not sent to ProofHub",
+    "nothingPending": "Everything from the last 30 days is in ProofHub.",
+    "pendingSummary": "{{count}} to send ({{hours}})",
+    "unitsCount": "{{count}} entries",
+    "sendAll": "Send all",
+    "sendAllConfirm": "Send {{count}} ProofHub entries from {{days}} days ({{hours}} in total)?",
+    "disconnectConfirm": "Disconnect from ProofHub? The API key is removed from this computer; project mappings and what was already sent are kept.",
+    "pendingSummaryShort": "{{count}} to send to ProofHub"
   },
   "confirm": {
     "ok": "OK"

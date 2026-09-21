@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { Check, ChevronRight, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Check, ChevronRight, Loader2, RefreshCw, SearchCheck, Send, Trash2 } from "lucide-react";
 import { useProofHubStore, type RemoteItem } from "./useProofHubStore";
 import { linksTasks } from "../../db/proofhubSettings";
 import { useProjectsStore } from "../../store/useProjectsStore";
@@ -11,11 +11,12 @@ import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
 import { Switch } from "../../components/ui/Switch";
 import { cn } from "../../lib/cn";
-import { dayKey, formatDurationHuman } from "../../lib/time";
-import { checkUnits, deleteRemoteEntry, findRemoteOnly, useSyncPlan, type RemoteOnlyEntry } from "./sync";
-import { refKey } from "./plan";
+import { dayKey, formatDayLabel, formatDurationHuman } from "../../lib/time";
+import i18n from "../../i18n";
+import { checkUnits, deleteRemoteEntry, findRemoteOnly, sendUnits, useSyncPlan, type RemoteOnlyEntry } from "./sync";
+import { sendWithConfirm } from "./SyncBadge";
+import { applyRemoteCheck, refKey, type SyncUnit } from "./plan";
 import { confirm } from "../../components/ui/ConfirmDialog";
-import { applyRemoteCheck } from "./plan";
 
 /** How far back "check sent entries" looks — deletions in ProofHub rarely happen later than that. */
 const CHECK_DAYS = 30;
@@ -64,6 +65,11 @@ export function ProofHubView() {
     } catch (err) {
       setConnectError(String(err));
     }
+  };
+
+  const handleDisconnect = async () => {
+    const ok = await confirm(t("proofhub.disconnectConfirm"), { danger: true, confirmLabel: t("proofhub.disconnect") });
+    if (ok) await proofhub.disconnect();
   };
 
   const handleCheckSent = async () => {
@@ -124,8 +130,23 @@ export function ProofHubView() {
   };
 
   return (
-    <div className="mx-auto h-full max-w-xl overflow-y-auto py-2">
-      <h1 className="mb-4 text-lg font-semibold">{t("proofhub.title")}</h1>
+    <div className="mx-auto h-full max-w-2xl overflow-y-auto py-2 pr-1">
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold">{t("proofhub.title")}</h1>
+          {proofhub.subdomain && (
+            <p className="mt-0.5 flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              {t("proofhub.connectedTo", { subdomain: proofhub.subdomain })}
+            </p>
+          )}
+        </div>
+        {proofhub.subdomain && (
+          <Button variant="ghost" size="sm" onClick={handleDisconnect}>
+            {t("proofhub.disconnect")}
+          </Button>
+        )}
+      </div>
 
       {!proofhub.subdomain && (
         <section className="rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
@@ -159,83 +180,88 @@ export function ProofHubView() {
       )}
 
       {proofhub.subdomain && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-[var(--color-text-muted)]">
-              {t("proofhub.connectedTo", { subdomain: proofhub.subdomain })}
-            </p>
-            <Button variant="ghost" size="sm" onClick={() => proofhub.disconnect()}>
-              {t("proofhub.disconnect")}
-            </Button>
-          </div>
-
-          <div className="flex items-center justify-between rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-            <div>
-              <p className="text-sm">{t("proofhub.groupPushesByDay")}</p>
-              <p className="text-xs text-[var(--color-text-muted)]">{t("proofhub.groupPushesByDayDescription")}</p>
-            </div>
-            <Switch
-              checked={proofhub.groupPushesByDay}
-              onChange={proofhub.setGroupPushesByDay}
-              label={t("proofhub.groupPushesByDay")}
-            />
-          </div>
-
-          <div className="rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm">{t("proofhub.checkSent")}</p>
-                <p className="text-xs text-[var(--color-text-muted)]">
-                  {t("proofhub.checkSentDescription", { days: CHECK_DAYS })}
-                </p>
-              </div>
+        <div className="space-y-8">
+          <Section
+            title={t("proofhub.sendsTitle")}
+            description={t("proofhub.checkSentDescription", { days: CHECK_DAYS })}
+            action={
               <Button variant="secondary" size="sm" onClick={handleCheckSent} disabled={checking}>
-                {checking && <Loader2 size={13} className="animate-spin" />}
-                {checking ? t("proofhub.checking") : t("proofhub.check")}
+                {checking ? <Loader2 size={13} className="animate-spin" /> : <SearchCheck size={13} />}
+                {checking ? t("proofhub.checking") : t("proofhub.checkSent")}
               </Button>
-            </div>
-            {checkResult && <p className="mt-2 text-xs text-[var(--color-text-muted)]">{checkResult}</p>}
-            {checkError && <p className="mt-2 text-xs text-[var(--color-danger)]">{checkError}</p>}
-            {remoteOnly && (
-              <RemoteOnlyList
-                entries={remoteOnly}
-                onDeleted={(ref) => setRemoteOnly((list) => list?.filter((e) => refKey(e) !== refKey(ref)) ?? null)}
-              />
-            )}
-          </div>
-
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium">{t("proofhub.projectMappings")}</h2>
-            <Button variant="ghost" size="sm" onClick={handleRefreshProjects} disabled={refreshing}>
-              <RefreshCw size={13} className={refreshing ? "animate-spin" : undefined} />
-              {t("proofhub.refresh")}
-            </Button>
-          </div>
-
-          {projectsError && <p className="text-xs text-[var(--color-danger)]">{projectsError}</p>}
-
-          {proofhub.remoteProjects && (
-            <div className="space-y-3">
-              {projects
-                .filter((p) => !p.archived)
-                .map((project) => (
-                  <ProjectMappingRow
-                    key={project.id}
-                    chronosProjectId={project.id}
-                    chronosProjectName={project.name}
-                    proofhubProjects={proofhub.remoteProjects!}
+            }
+          >
+            <PendingDays since={dayKey(new Date(Date.now() - CHECK_DAYS * 86_400_000).toISOString())} />
+            {(checkResult || checkError || remoteOnly) && (
+              <div className="border-t border-[var(--color-border)] p-3">
+                {checkResult && <p className="text-xs text-[var(--color-text-muted)]">{checkResult}</p>}
+                {checkError && <p className="text-xs text-[var(--color-danger)]">{checkError}</p>}
+                {remoteOnly && (
+                  <RemoteOnlyList
+                    entries={remoteOnly}
+                    onDeleted={(ref) => setRemoteOnly((list) => list?.filter((e) => refKey(e) !== refKey(ref)) ?? null)}
                   />
-                ))}
-              {projects.filter((p) => !p.archived).length === 0 && (
-                <p className="text-xs text-[var(--color-text-muted)]">{t("proofhub.noProjects")}</p>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
+          </Section>
 
-          <div className="border-t border-[var(--color-border)] pt-3">
+          <Section
+            title={t("proofhub.projectMappings")}
+            description={t("proofhub.projectMappingsDescription")}
+            action={
+              <Button variant="ghost" size="sm" onClick={handleRefreshProjects} disabled={refreshing}>
+                <RefreshCw size={13} className={refreshing ? "animate-spin" : undefined} />
+                {t("proofhub.refresh")}
+              </Button>
+            }
+          >
+            {projectsError && <p className="p-3 text-xs text-[var(--color-danger)]">{projectsError}</p>}
+            {!proofhub.remoteProjects && !projectsError && (
+              <p className="flex items-center gap-2 p-3 text-xs text-[var(--color-text-muted)]">
+                <Loader2 size={13} className="animate-spin" />
+                {t("proofhub.loadingProjects")}
+              </p>
+            )}
+            {proofhub.remoteProjects && (
+              <div className="divide-y divide-[var(--color-border)]">
+                {projects
+                  .filter((p) => !p.archived)
+                  .map((project) => (
+                    <ProjectMappingRow
+                      key={project.id}
+                      chronosProjectId={project.id}
+                      chronosProjectName={project.name}
+                      chronosProjectColor={project.color}
+                      proofhubProjects={proofhub.remoteProjects!}
+                    />
+                  ))}
+                {projects.filter((p) => !p.archived).length === 0 && (
+                  <p className="p-3 text-xs text-[var(--color-text-muted)]">{t("proofhub.noProjects")}</p>
+                )}
+              </div>
+            )}
+          </Section>
+
+          <Section title={t("proofhub.optionsTitle")}>
+            <div className="flex items-center justify-between gap-4 p-3">
+              <div>
+                <p className="text-sm">{t("proofhub.groupPushesByDay")}</p>
+                <p className="text-xs text-[var(--color-text-muted)]">{t("proofhub.groupPushesByDayDescription")}</p>
+              </div>
+              <Switch
+                checked={proofhub.groupPushesByDay}
+                onChange={proofhub.setGroupPushesByDay}
+                label={t("proofhub.groupPushesByDay")}
+              />
+            </div>
+          </Section>
+
+          <div>
             <button
               type="button"
               onClick={handleToggleDebugLog}
+              aria-expanded={debugLogOpen}
               className="flex items-center gap-1 text-xs text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
             >
               <ChevronRight size={12} className={cn("transition-transform", debugLogOpen && "rotate-90")} />
@@ -266,13 +292,139 @@ export function ProofHubView() {
   );
 }
 
+/** A titled block of the tab: heading, one-line purpose, optional action, and its content in a card. */
+function Section({
+  title,
+  description,
+  action,
+  children,
+}: {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section>
+      <div className="mb-2 flex items-end justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold">{title}</h2>
+          {description && <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{description}</p>}
+        </div>
+        {action}
+      </div>
+      <div className="rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)]">{children}</div>
+    </section>
+  );
+}
+
+/**
+ * Everything not yet in ProofHub (or needing a resend) from `since` on, a
+ * line per day — the one place to see what's left across days, instead of
+ * scrolling the timer list for day headers.
+ */
+function PendingDays({ since }: { since: string }) {
+  const { t } = useTranslation();
+  const plan = useSyncPlan();
+  const [sendingDay, setSendingDay] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const byDay = new Map<string, SyncUnit[]>();
+  for (const unit of plan.units) {
+    if (unit.status === "synced" || unit.day < since) continue;
+    if (!byDay.has(unit.day)) byDay.set(unit.day, []);
+    byDay.get(unit.day)!.push(unit);
+  }
+  const days = Array.from(byDay.entries()).sort(([a], [b]) => (a < b ? 1 : -1));
+  const all = days.flatMap(([, units]) => units);
+
+  async function send(key: string, units: SyncUnit[]) {
+    setSendingDay(key);
+    setError(null);
+    try {
+      await sendWithConfirm(units, t);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setSendingDay(null);
+    }
+  }
+
+  async function sendAll() {
+    const hours = formatDurationHuman(all.reduce((sum, unit) => sum + unit.totalSeconds, 0));
+    const ok = await confirm(t("proofhub.sendAllConfirm", { count: all.length, days: days.length, hours }), {
+      confirmLabel: t("proofhub.sendAll"),
+    });
+    if (!ok) return;
+    setSendingDay("all");
+    setError(null);
+    const errors = await sendUnits(all);
+    if (errors.length > 0) setError(t("proofhub.sendDayFailure", { count: errors.length, message: errors[0] }));
+    setSendingDay(null);
+  }
+
+  if (days.length === 0) {
+    return (
+      <p className="flex items-center gap-2 p-3 text-xs text-[var(--color-text-muted)]">
+        <Check size={13} className="text-[var(--color-accent)]" />
+        {t("proofhub.nothingPending")}
+      </p>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] px-3 py-2">
+        <p className="text-xs text-[var(--color-text-muted)]">
+          {t("proofhub.pendingSummary", {
+            count: all.length,
+            hours: formatDurationHuman(all.reduce((sum, unit) => sum + unit.totalSeconds, 0)),
+          })}
+        </p>
+        <Button variant="primary" size="sm" onClick={sendAll} disabled={sendingDay !== null}>
+          {sendingDay === "all" ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+          {t("proofhub.sendAll")}
+        </Button>
+      </div>
+      <ul className="divide-y divide-[var(--color-border)]">
+        {days.map(([day, units]) => {
+          const problems = units.filter((u) => u.status === "missing" || u.status === "changed").length;
+          return (
+            <li key={day} className="flex items-center gap-3 px-3 py-2 text-sm">
+              <span className="min-w-0 flex-1 truncate capitalize">
+                {formatDayLabel(units[0].entries[0].startTime, i18n.language)}
+              </span>
+              {problems > 0 && (
+                <span className="text-xs text-[var(--color-danger)]">{t("proofhub.dayProblems", { count: problems })}</span>
+              )}
+              <span className="text-xs text-[var(--color-text-muted)]">
+                {t("proofhub.unitsCount", { count: units.length })}
+              </span>
+              <span className="w-16 text-right font-mono text-xs tabular-nums">
+                {formatDurationHuman(units.reduce((sum, unit) => sum + unit.totalSeconds, 0))}
+              </span>
+              <Button variant="ghost" size="sm" onClick={() => send(day, units)} disabled={sendingDay !== null}>
+                {sendingDay === day ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                {t("proofhub.send")}
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+      {error && <p className="border-t border-[var(--color-border)] p-3 text-xs text-[var(--color-danger)]">{error}</p>}
+    </div>
+  );
+}
+
 function ProjectMappingRow({
   chronosProjectId,
   chronosProjectName,
+  chronosProjectColor,
   proofhubProjects,
 }: {
   chronosProjectId: string;
   chronosProjectName: string;
+  chronosProjectColor: string;
   proofhubProjects: RemoteItem[];
 }) {
   const { t } = useTranslation();
@@ -322,9 +474,15 @@ function ProjectMappingRow({
   };
 
   return (
-    <div className="rounded-[2px] border border-[var(--color-border)] p-3">
+    <div className="p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-sm font-medium">{chronosProjectName}</p>
+        <p className="flex items-center gap-2 text-sm font-medium">
+          <span className="h-2 w-2 shrink-0 rounded-[1px]" style={{ backgroundColor: chronosProjectColor }} />
+          {chronosProjectName}
+          {!mapping && (
+            <span className="text-xs font-normal text-[var(--color-text-muted)]">— {t("proofhub.notMapped")}</span>
+          )}
+        </p>
         {mapping && (
           <button
             type="button"

@@ -12,6 +12,7 @@ import { useLiveElapsed } from "../../hooks/useLiveElapsed";
 import { formatDateShort, formatDayLabel, formatDurationHuman } from "../../lib/time";
 import { checkUnits, sendUnits, useSyncPlan } from "../../integrations/proofhub/sync";
 import i18n from "../../i18n";
+import { cn } from "../../lib/cn";
 
 interface DayGroupProps {
   dayKey: string;
@@ -34,6 +35,64 @@ function formatEntryLine(entry: TimeEntry, project: Project | null): string {
   if (project) parts.push(project.alias || project.name);
   parts.push(entry.description || "");
   return ` - ${parts.filter(Boolean).join(" - ")}`;
+}
+
+// Secondary day actions: shown while the day (a `group` ancestor) is hovered.
+const headerIconButton =
+  "rounded-[2px] p-1 text-[var(--color-text-muted)] opacity-0 outline-none transition-opacity hover:bg-[var(--color-border)] focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)] group-hover:opacity-100";
+
+/**
+ * The day's ProofHub state, always visible — sending the day is the daily
+ * routine, so it shouldn't hide behind a hover. "Send N" while anything is
+ * unsent (red when some of it was deleted or changed in ProofHub), a quiet
+ * "Sent" once everything is, which still resends the day when clicked.
+ */
+function DaySyncPill({
+  pending,
+  problems,
+  sending,
+  onClick,
+}: {
+  pending: number;
+  problems: number;
+  sending: boolean;
+  onClick: () => void;
+}) {
+  const { t } = useTranslation();
+  const label = sending
+    ? t("proofhub.sending")
+    : pending > 0
+      ? t("proofhub.sendCount", { count: pending })
+      : t("proofhub.daySent");
+  const title = pending > 0 ? t("proofhub.sendDay") : t("proofhub.resendDay");
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={sending}
+      title={problems > 0 ? `${title} — ${t("proofhub.dayProblems", { count: problems })}` : title}
+      className={cn(
+        "group/pill flex h-6 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium outline-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-accent)]",
+        pending === 0
+          ? "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
+          : problems > 0
+            ? "bg-[color-mix(in_srgb,var(--color-danger)_14%,transparent)] text-[var(--color-danger)] hover:bg-[color-mix(in_srgb,var(--color-danger)_22%,transparent)]"
+            : "bg-[color-mix(in_srgb,var(--color-accent)_14%,transparent)] text-[var(--color-accent)] hover:bg-[color-mix(in_srgb,var(--color-accent)_22%,transparent)]",
+      )}
+    >
+      {sending ? (
+        <Loader2 size={12} className="animate-spin" />
+      ) : pending > 0 ? (
+        <Send size={12} />
+      ) : (
+        <>
+          <Check size={12} className="text-[var(--color-accent)] group-hover/pill:hidden" />
+          <RefreshCw size={12} className="hidden group-hover/pill:block" />
+        </>
+      )}
+      {label}
+    </button>
+  );
 }
 
 export function DayGroup({ dayKey, label, items, runningEntry }: DayGroupProps) {
@@ -110,40 +169,18 @@ export function DayGroup({ dayKey, label, items, runningEntry }: DayGroupProps) 
 
   return (
     <div className="group mb-4">
-      <div className="flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-        <span className="flex items-center gap-1.5">
+      <div className="flex items-center justify-between gap-3 px-3 py-1.5">
+        <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
           <span>{title}</span>
           <button
             type="button"
             onClick={handleCopyDay}
             aria-label={t("records.copyDay")}
             title={t("records.copyDay")}
-            className="rounded-[2px] p-1 text-[var(--color-text-muted)] opacity-0 outline-none transition-opacity hover:bg-[var(--color-border)] focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)] group-hover:opacity-100"
+            className={headerIconButton}
           >
             {copied ? <Check size={12} className="text-[var(--color-accent)]" /> : <Copy size={12} />}
           </button>
-          {dayUnits.length > 0 && (
-            <button
-              type="button"
-              onClick={handleSendDay}
-              disabled={sendingDay}
-              aria-label={t(daySynced ? "proofhub.resendDay" : "proofhub.sendDay")}
-              title={t(daySynced ? "proofhub.resendDay" : "proofhub.sendDay")}
-              className="group/send rounded-[2px] p-1 text-[var(--color-text-muted)] opacity-0 outline-none transition-opacity hover:bg-[var(--color-border)] focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)] group-hover:opacity-100"
-            >
-              {sendingDay ? (
-                <Loader2 size={12} className="animate-spin" />
-              ) : daySynced ? (
-                // A checkmark doesn't look clickable, so hovering shows what a click does.
-                <>
-                  <Check size={12} className="text-[var(--color-accent)] group-hover/send:hidden group-focus-visible/send:hidden" />
-                  <RefreshCw size={12} className="hidden group-hover/send:block group-focus-visible/send:block" />
-                </>
-              ) : (
-                <Send size={12} />
-              )}
-            </button>
-          )}
           {daySent && (
             <button
               type="button"
@@ -151,14 +188,25 @@ export function DayGroup({ dayKey, label, items, runningEntry }: DayGroupProps) 
               disabled={checkingDay}
               aria-label={t("proofhub.checkDay")}
               title={t("proofhub.checkDay")}
-              className="rounded-[2px] p-1 text-[var(--color-text-muted)] opacity-0 outline-none transition-opacity hover:bg-[var(--color-border)] focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)] group-hover:opacity-100"
+              className={headerIconButton}
             >
               {checkingDay ? <Loader2 size={12} className="animate-spin" /> : <SearchCheck size={12} />}
             </button>
           )}
         </span>
-        <span>
-          {t("records.total")}: {formatDurationHuman(total)}
+        <span className="flex items-center gap-3">
+          {dayUnits.length > 0 && (
+            <DaySyncPill
+              pending={unsynced.length}
+              problems={unsynced.filter((unit) => unit.status === "missing" || unit.status === "changed").length}
+              sending={sendingDay}
+              onClick={handleSendDay}
+            />
+          )}
+          <span className="font-mono text-xs tabular-nums text-[var(--color-text-muted)]">
+            <span className="mr-1.5 font-sans font-semibold uppercase tracking-wide">{t("records.total")}</span>
+            {formatDurationHuman(total)}
+          </span>
         </span>
       </div>
       {sendError && <p className="px-3 pb-1 text-xs text-[var(--color-danger)]">{sendError}</p>}

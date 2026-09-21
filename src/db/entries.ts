@@ -1,6 +1,6 @@
 import { getDb } from "./client";
 import type { TimeEntry } from "../types";
-import { nowIso } from "../lib/time";
+import { durationBetween, nowIso } from "../lib/time";
 import * as tagsDb from "./tags";
 
 interface EntryRow {
@@ -84,6 +84,40 @@ export async function startEntry(input: StartEntryInput): Promise<TimeEntry> {
       (id, description, task_number, project_id, start_time, end_time, duration_seconds, is_running, created_at, updated_at)
      VALUES ($1, $2, $3, $4, $5, NULL, NULL, 1, $6, $6)`,
     [entry.id, entry.description, entry.taskNumber, entry.projectId, entry.startTime, now],
+  );
+  return entry;
+}
+
+export interface AddEntryInput extends StartEntryInput {
+  endTime: string;
+}
+
+/** Inserts an already-finished entry (manual entry), independent of any running timer. */
+export async function addEntry(input: AddEntryInput): Promise<TimeEntry> {
+  const db = await getDb();
+  const now = nowIso();
+  const durationSeconds = durationBetween(input.startTime, input.endTime);
+  const entry: TimeEntry = {
+    id: crypto.randomUUID(),
+    description: input.description,
+    taskNumber: input.taskNumber,
+    projectId: input.projectId,
+    startTime: input.startTime,
+    endTime: input.endTime,
+    durationSeconds,
+    isRunning: false,
+    createdAt: now,
+    updatedAt: now,
+    tags: [],
+    proofhubTimeEntryId: null,
+    proofhubSyncedAt: null,
+    note: null,
+  };
+  await db.execute(
+    `INSERT INTO time_entries
+      (id, description, task_number, project_id, start_time, end_time, duration_seconds, is_running, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $8)`,
+    [entry.id, entry.description, entry.taskNumber, entry.projectId, entry.startTime, entry.endTime, durationSeconds, now],
   );
   return entry;
 }

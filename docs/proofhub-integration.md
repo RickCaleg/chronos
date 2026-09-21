@@ -506,9 +506,14 @@ are refused rather than logged as 0h 0m.
   Send/Send again, Check (§8.5) and "Forget it was sent", which clears the
   entries' ref so they're `new` again without touching ProofHub (it asks
   first: if the ProofHub entry still exists, sending creates a second one).
-- **Per day** (day header, next to copy): sends every unit of the day that
-  isn't synced, after a confirmation with the count and total. Once the
-  whole day is synced it becomes a checkmark that resends the whole day.
+- **Per day** (an always-visible pill in the day header, next to the
+  total): "Send N" while units are unsent (red when some were deleted or
+  changed in ProofHub), sending them after a confirmation with the count
+  and total; a quiet "Sent" once the whole day is synced, which resends the
+  whole day.
+- **Across days**: the ProofHub tab's "Sending" section lists every day of
+  the last 30 with something unsent, each with its own Send, plus "Send
+  all"; the ProofHub nav tab shows that pending count from any screen.
   Failures don't stop the rest; the first error is shown under the header
   and each failed row keeps its own. Next to it, once anything that day was
   sent, a check button (§8.5) for the day.

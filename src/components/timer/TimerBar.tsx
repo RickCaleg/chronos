@@ -112,7 +112,14 @@ export function TimerBar() {
 
       <div className="ml-auto flex items-center gap-3">
         {isRunning && <TimeAdjustPopover startTime={runningEntry.startTime} onChange={setRunningStart} />}
-        <span className="w-20 text-right font-mono text-lg tabular-nums">{formatClock(elapsed)}</span>
+        <span
+          className={cn(
+            "w-20 text-right font-mono text-lg tabular-nums transition-colors",
+            !isRunning && "text-[var(--color-text-muted)] opacity-60",
+          )}
+        >
+          {formatClock(elapsed)}
+        </span>
         {isRunning && (
           <button
             type="button"

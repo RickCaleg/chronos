@@ -6,6 +6,7 @@ import { CommandPalette } from "./components/CommandPalette";
 import { ConfirmDialog } from "./components/ui/ConfirmDialog";
 import { TimerBar } from "./components/timer/TimerBar";
 import { RecordsView } from "./components/records/RecordsView";
+import { RecordsToolbar } from "./components/records/RecordsToolbar";
 import { ProjectsView } from "./components/projects/ProjectsView";
 import { SettingsView } from "./components/settings/SettingsView";
 import { useProjectsStore } from "./store/useProjectsStore";
@@ -89,6 +90,7 @@ function App() {
       if (e.key === "1") setView("timer");
       else if (e.key === "2") setView("projects");
       else if (e.key === "3") setView("settings");
+      else if (e.key === "4" && useProofHubStore.getState().installed) setView("proofhub");
       else return;
       e.preventDefault();
     }
@@ -104,6 +106,7 @@ function App() {
         {!loaded ? null : view === "timer" ? (
           <div className="flex h-full flex-col gap-4">
             <TimerBar />
+            <RecordsToolbar onOpenPalette={() => setPaletteOpen(true)} />
             <div className="min-h-0 flex-1">
               <RecordsView />
             </div>

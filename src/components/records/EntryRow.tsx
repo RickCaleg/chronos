@@ -9,13 +9,13 @@ import { useEntriesStore } from "../../store/useEntriesStore";
 import { EntryEditPopover } from "./EntryEditPopover";
 import { EntryNote, NoteButton } from "./EntryNote";
 import { RestartButton } from "./RestartButton";
+import { revealOnRowHover, rowIconButton } from "./rowStyles";
+import { cn } from "../../lib/cn";
 import { formatDurationHuman, formatTimeShort } from "../../lib/time";
 import { projectLabel } from "../../lib/projectLabel";
 import { SyncBadge } from "../../integrations/proofhub/SyncBadge";
 import i18n from "../../i18n";
 
-const iconButtonClass =
-  "shrink-0 rounded-[2px] p-1.5 text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-border)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)]";
 
 export function EntryRow({ entry }: { entry: TimeEntry }) {
   const { t } = useTranslation();
@@ -109,7 +109,13 @@ export function EntryRow({ entry }: { entry: TimeEntry }) {
 
         <SyncBadge entries={[entry]} />
 
-        <button type="button" onClick={handleCopy} aria-label={t("records.copy")} className={iconButtonClass}>
+        <button
+          type="button"
+          onClick={handleCopy}
+          aria-label={t("records.copy")}
+          title={t("records.copy")}
+          className={cn(rowIconButton, !copied && revealOnRowHover)}
+        >
           {copied ? <Check size={14} className="text-[var(--color-accent)]" /> : <Copy size={14} />}
         </button>
 
@@ -117,7 +123,8 @@ export function EntryRow({ entry }: { entry: TimeEntry }) {
           type="button"
           onClick={handleDelete}
           aria-label={t("editor.delete")}
-          className={`${iconButtonClass} hover:text-[var(--color-danger)]`}
+          title={t("editor.delete")}
+          className={cn(rowIconButton, revealOnRowHover, "hover:text-[var(--color-danger)]")}
         >
           <Trash2 size={14} />
         </button>

@@ -6,7 +6,7 @@ import { AutocompleteInput } from "../ui/AutocompleteInput";
 import { TagInput } from "../ui/TagInput";
 import { Button } from "../ui/Button";
 import { ProjectPicker } from "../timer/ProjectPicker";
-import type { TimeEntry } from "../../types";
+import type { Tag, TimeEntry } from "../../types";
 import { useEntriesStore } from "../../store/useEntriesStore";
 import { useTagsStore } from "../../store/useTagsStore";
 import {
@@ -28,11 +28,26 @@ interface EntryEditPopoverProps {
   open: boolean;
   onClose: () => void;
   entry: TimeEntry;
-  onSave: (patch: EntryPatch) => void;
-  onDelete: () => void;
+  /** `tags` is only meaningful for a new entry: an existing one's tags are saved as they change. */
+  onSave: (patch: EntryPatch, tags: Tag[]) => void;
+  onDelete?: () => void;
+  /**
+   * `entry` is a not-yet-saved draft (manual entry): tags are kept until
+   * saving, and there's nothing to delete or sync yet.
+   */
+  isNew?: boolean;
+  align?: "left" | "right";
 }
 
-export function EntryEditPopover({ open, onClose, entry, onSave, onDelete }: EntryEditPopoverProps) {
+export function EntryEditPopover({
+  open,
+  onClose,
+  entry,
+  onSave,
+  onDelete,
+  isNew = false,
+  align = "right",
+}: EntryEditPopoverProps) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState(combineTaskDescription(entry.taskNumber, entry.description));
   const [projectId, setProjectId] = useState<string | null>(entry.projectId);
@@ -52,6 +67,7 @@ export function EntryEditPopover({ open, onClose, entry, onSave, onDelete }: Ent
   const { projects } = useProjectsStore();
   const { tags: allTags, findOrCreate: findOrCreateTag } = useTagsStore();
   const setEntryTags = useEntriesStore((s) => s.setEntryTags);
+  const [stagedTags, setStagedTags] = useState<Tag[]>(entry.tags);
 
   if (!open) return null;
 
@@ -145,13 +161,14 @@ export function EntryEditPopover({ open, onClose, entry, onSave, onDelete }: Ent
       startTime: start,
       endTime: end,
       durationSeconds: durationBetween(start, end),
-    });
+    }, stagedTags);
     onClose();
   }
 
   return (
-    <FloatingPanel open={open} onClose={onClose} align="right" className="w-80">
+    <FloatingPanel open={open} onClose={onClose} align={align} className="w-80">
       <form onSubmit={handleSubmit} className="space-y-3">
+        {isNew && <h2 className="text-sm font-medium">{t("editor.newEntry")}</h2>}
         <div>
           <label className="mb-1 block text-xs font-medium text-[var(--color-text-muted)]">
             {t("editor.taskDescription")}
@@ -176,8 +193,8 @@ export function EntryEditPopover({ open, onClose, entry, onSave, onDelete }: Ent
         <div>
           <label className="mb-1 block text-xs font-medium text-[var(--color-text-muted)]">{t("editor.tags")}</label>
           <TagInput
-            value={entry.tags}
-            onChange={(tags) => setEntryTags(entry.id, tags)}
+            value={isNew ? stagedTags : entry.tags}
+            onChange={(tags) => (isNew ? setStagedTags(tags) : setEntryTags(entry.id, tags))}
             suggestions={allTags}
             onCreate={findOrCreateTag}
             placeholder={t("editor.tagsPlaceholder")}
@@ -230,18 +247,22 @@ export function EntryEditPopover({ open, onClose, entry, onSave, onDelete }: Ent
           <p className="text-xs text-[var(--color-danger)]">{t("editor.invalidRange")}</p>
         )}
 
-        <SyncSection entry={entry} />
+        {!isNew && <SyncSection entry={entry} />}
 
         <div className="flex items-center justify-between pt-1">
-          <Button type="button" size="sm" variant="danger" onClick={onDelete}>
-            {t("editor.delete")}
-          </Button>
+          {onDelete ? (
+            <Button type="button" size="sm" variant="danger" onClick={onDelete}>
+              {t("editor.delete")}
+            </Button>
+          ) : (
+            <span />
+          )}
           <div className="flex gap-2">
             <Button type="button" size="sm" variant="ghost" onClick={onClose}>
               {t("editor.cancel")}
             </Button>
             <Button type="submit" size="sm" variant="primary" disabled={hasErrors}>
-              {t("editor.save")}
+              {isNew ? t("editor.add") : t("editor.save")}
             </Button>
           </div>
         </div>
