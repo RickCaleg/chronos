@@ -109,7 +109,7 @@ export function EntryRow({ entry }: { entry: TimeEntry }) {
         </span>
       </button>
 
-      <SyncBadge entry={entry} />
+      <SyncBadge entries={[entry]} />
 
       <button
         type="button"

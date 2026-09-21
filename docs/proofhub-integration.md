@@ -469,7 +469,9 @@ changes (`useSyncPlan` in `sync.ts`). For each unit it decides:
   twice;
 - **status** — `new` (never sent), `pending` (needs sending: edited, a new
   entry joined its group, or its ProofHub entry also holds other units'
-  hours), or `synced`.
+  hours), or `synced`. After a check against ProofHub (§8.5), a `synced`
+  unit can also be `missing` (deleted there) or `changed` (other hours or
+  date there) — `applyRemoteCheck` in `plan.ts`.
 
 Sending a unit (`sendUnits` in `sync.ts`): resolve the task if linking is
 on, `delete-entry` each orphan, `upsert-entry` with the reused id, then
@@ -481,17 +483,24 @@ are refused rather than logged as 0h 0m.
 
 ### 8.2 The buttons
 
-- **Per row** (`SyncBadge`, in `EntryRow`, and on a collapsed
-  `GroupedEntryRow` when the displayed group is exactly one unit): send
-  (`new`), update (`pending`), error (click to retry; tooltip has the
-  reason), or a checkmark (`synced`) — which is clickable too: after a
-  confirmation it sends the unit again. That's the answer to "I deleted or
-  fixed it in ProofHub, now resend it". A row always sends its whole unit.
+- **Per row** (`SyncBadge`, in `EntryRow` and on a collapsed
+  `GroupedEntryRow`): send (`new`), update (`pending`), send in red
+  (`missing`), update in red (`changed` — overwriting asks first), error
+  (click to retry; tooltip has the reason), or a checkmark (`synced`) —
+  which turns into a resend icon on hover and, after a confirmation, sends
+  the unit again. A row always sends its whole unit; a collapsed group that
+  spans several units (grouped display, ungrouped pushes) sends all of
+  them, showing the most urgent status.
+- **In the edit popover** (`SyncSection`): the status in words, plus
+  Send/Send again, Check (§8.5) and "Forget it was sent", which clears the
+  entries' ref so they're `new` again without touching ProofHub (it asks
+  first: if the ProofHub entry still exists, sending creates a second one).
 - **Per day** (day header, next to copy): sends every unit of the day that
   isn't synced, after a confirmation with the count and total. Once the
   whole day is synced it becomes a checkmark that resends the whole day.
   Failures don't stop the rest; the first error is shown under the header
-  and each failed row keeps its own.
+  and each failed row keeps its own. Next to it, once anything that day was
+  sent, a check button (§8.5) for the day.
 
 ### 8.3 Edits and deletes after a push
 
@@ -507,6 +516,23 @@ resend.
 Deliberately not building an automatic push-on-stop mode for v1 — the most
 surprising option for a tool whose identity is "manual, you're always in
 control." Revisit only if real usage shows people want it.
+
+### 8.5 Checking what's still in ProofHub
+
+ProofHub has no webhooks, so an entry deleted or edited there by hand is
+invisible to Chronos until it asks. A check (`checkUnits` in `sync.ts`,
+plugin action `check-entries`) takes the units' `reuse` refs, lists each
+referenced timesheet once (`GET .../timesheets/{id}/time`) and, for any id
+not in that listing — its paging isn't confirmed — falls back to the
+single-entry lookup `time_entry_exists` already relies on. Each result
+(exists, logged hours/minutes, date) is kept in `remoteEntries` in the
+ProofHub store, **in memory only**: a check is a snapshot, and a fresh
+session starts from "not checked" rather than trusting stale data. A send
+records what it just wrote there, so a resent unit reads `synced` again.
+
+Checks only run when asked: the day header's check button, "Check" in the
+edit popover, and "Check sent entries" in the ProofHub tab (units sent in
+the last 30 days). No background polling, in the same spirit as §8.4.
 
 ## 9. Error handling
 

@@ -22,6 +22,7 @@ import type { EntryPatch } from "../../db/entries";
 import { useSuggestions } from "../../hooks/useSuggestions";
 import { useProjectsStore } from "../../store/useProjectsStore";
 import { matchProjectByAlias, parsePastedEntry } from "../../lib/pasteParser";
+import { SyncSection } from "../../integrations/proofhub/SyncSection";
 
 interface EntryEditPopoverProps {
   open: boolean;
@@ -228,6 +229,8 @@ export function EntryEditPopover({ open, onClose, entry, onSave, onDelete }: Ent
         {!startError && !endError && !isFutureStart && isInvalidRange && (
           <p className="text-xs text-[var(--color-danger)]">{t("editor.invalidRange")}</p>
         )}
+
+        <SyncSection entry={entry} />
 
         <div className="flex items-center justify-between pt-1">
           <Button type="button" size="sm" variant="danger" onClick={onDelete}>

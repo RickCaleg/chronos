@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import * as proofhubDb from "../../db/proofhubSettings";
 import type { ProofHubProjectMap, ProofHubProjectMapping } from "../../db/proofhubSettings";
+import type { RemoteEntryState } from "./plan";
 
 export interface RemoteItem {
   id: string;
@@ -46,6 +47,13 @@ interface ProofHubState {
   sending: Record<string, boolean>;
   sendErrors: Record<string, string>;
 
+  /**
+   * What checks against ProofHub last saw, by `refKey` (see plan.ts) — in
+   * memory only, so an entry deleted in ProofHub shows up after the next
+   * check, never from stale data of a previous session.
+   */
+  remoteEntries: Record<string, RemoteEntryState>;
+
   load: () => Promise<void>;
   install: () => Promise<void>;
   uninstall: () => Promise<void>;
@@ -60,6 +68,7 @@ interface ProofHubState {
   loadTimesheets: (proofhubProjectId: string, force?: boolean) => Promise<RemoteItem[]>;
   findTask: (proofhubProjectId: string, ticket: string) => Promise<RemoteTask | null>;
   setSendState: (entryIds: string[], sending: boolean, error?: string | null) => void;
+  setRemoteEntries: (states: Record<string, RemoteEntryState>) => void;
 }
 
 export const useProofHubStore = create<ProofHubState>((set, get) => ({
@@ -76,6 +85,7 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
   tasksByTicket: {},
   sending: {},
   sendErrors: {},
+  remoteEntries: {},
 
   load: async () => {
     const [status, subdomain, projectMap, groupPushesByDay] = await Promise.all([
@@ -111,7 +121,7 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
     set({ busy: true, error: null });
     try {
       await invoke("proofhub_plugin_uninstall");
-      set({ remoteProjects: null, timesheetsByProject: {}, tasksByTicket: {} });
+      set({ remoteProjects: null, timesheetsByProject: {}, tasksByTicket: {}, remoteEntries: {} });
       await get().load();
     } finally {
       set({ busy: false });
@@ -136,7 +146,7 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
 
   disconnect: async () => {
     await invoke("proofhub_clear_credentials");
-    set({ remoteProjects: null, timesheetsByProject: {}, tasksByTicket: {} });
+    set({ remoteProjects: null, timesheetsByProject: {}, tasksByTicket: {}, remoteEntries: {} });
     await get().load();
   },
 
@@ -195,4 +205,6 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
       return { sending: nextSending, sendErrors: nextErrors };
     });
   },
+
+  setRemoteEntries: (states) => set((state) => ({ remoteEntries: { ...state.remoteEntries, ...states } })),
 }));

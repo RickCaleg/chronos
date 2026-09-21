@@ -45,7 +45,11 @@ export function decodeRemoteRef(
   return fallback ? { ...fallback, timeId: value } : null;
 }
 
-export type UnitStatus = "new" | "pending" | "synced";
+/**
+ * `missing`/`changed` are `synced` units that a check against ProofHub
+ * (`applyRemoteCheck`) found deleted there, or with different hours/date.
+ */
+export type UnitStatus = "new" | "pending" | "synced" | "missing" | "changed";
 
 export interface SyncUnit {
   /** Stable while the unit's membership doesn't change: its entry ids, joined. */
@@ -65,7 +69,34 @@ export interface SyncUnit {
   status: UnitStatus;
 }
 
-const refKey = (ref: RemoteRef) => encodeRemoteRef(ref);
+export const refKey = (ref: RemoteRef) => encodeRemoteRef(ref);
+
+/** What a unit's ProofHub entry is sent as: whole minutes, dated by its first entry's local day. */
+export function unitMinutes(unit: Pick<SyncUnit, "totalSeconds">): number {
+  return Math.round(unit.totalSeconds / 60);
+}
+
+/** A ProofHub time entry as last seen by a check (or written by a send). */
+export type RemoteEntryState =
+  | { exists: false }
+  | { exists: true; minutes: number | null; date: string | null };
+
+/**
+ * Marks `synced` units whose ProofHub entry a check found deleted
+ * (`missing`) or holding other hours or another date than Chronos sent
+ * (`changed`). Units never checked keep their status — Chronos can't know.
+ */
+export function applyRemoteCheck(units: SyncUnit[], remote: Record<string, RemoteEntryState>): SyncUnit[] {
+  return units.map((unit) => {
+    if (unit.status !== "synced" || !unit.reuse) return unit;
+    const state = remote[refKey(unit.reuse)];
+    if (!state) return unit;
+    if (!state.exists) return { ...unit, status: "missing" };
+    const hoursDiffer = state.minutes !== null && state.minutes !== unitMinutes(unit);
+    const dateDiffers = state.date !== null && state.date !== unit.day;
+    return hoursDiffer || dateDiffers ? { ...unit, status: "changed" } : unit;
+  });
+}
 
 /** Plans every finished entry whose project is mapped. Units come back in chronological order. */
 export function planSync(entries: TimeEntry[], projectMap: ProofHubProjectMap, grouped: boolean): SyncUnit[] {

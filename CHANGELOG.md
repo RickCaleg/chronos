@@ -4,6 +4,12 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Added
+- Chronos can now check ProofHub for entries deleted or changed there by hand, which it had no way of knowing about. Use the new check button in a day's header, "Check" in an entry's edit popup, or "Check sent entries" in the ProofHub tab (last 30 days). An entry deleted in ProofHub then shows a red send icon, and one with other hours or another date shows a red update icon. The day's send button also picks them up. Checks only run when you ask.
+- An entry's edit popup has a ProofHub section showing its status in words, with Send/Send again, Check, and "Forget it was sent" (Chronos treats it as never sent, without touching ProofHub).
+### Changed
+- The ✓ on a sent row or day now turns into a resend icon on hover, so it's clear that it can be clicked to send again.
+- A collapsed group of rows now always shows the ProofHub button. Before, it only did with "group pushes by day" on, so with it off you had to expand the group to send or resend.
 ### Fixed
 - Editing a stopped entry while another timer was running: typing in the start (or end/duration) field sent the text to the description instead. The edit popup jumped focus back to its first field on every tick of the running timer; it now focuses it only when it opens.
 

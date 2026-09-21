@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Copy, Loader2, Send } from "lucide-react";
+import { Check, Copy, Loader2, RefreshCw, SearchCheck, Send } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { confirm } from "@tauri-apps/plugin-dialog";
 import type { Project, TimeEntry } from "../../types";
@@ -10,7 +10,7 @@ import { GroupedEntryRow } from "./GroupedEntryRow";
 import { useProjectsStore } from "../../store/useProjectsStore";
 import { useLiveElapsed } from "../../hooks/useLiveElapsed";
 import { formatDateShort, formatDayLabel, formatDurationHuman } from "../../lib/time";
-import { sendUnits, useSyncPlan } from "../../integrations/proofhub/sync";
+import { checkUnits, sendUnits, useSyncPlan } from "../../integrations/proofhub/sync";
 import i18n from "../../i18n";
 
 interface DayGroupProps {
@@ -41,6 +41,7 @@ export function DayGroup({ dayKey, label, items, runningEntry }: DayGroupProps) 
   const { projects } = useProjectsStore();
   const [copied, setCopied] = useState(false);
   const [sendingDay, setSendingDay] = useState(false);
+  const [checkingDay, setCheckingDay] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const runningElapsed = useLiveElapsed(runningEntry?.startTime);
   const total =
@@ -58,12 +59,18 @@ export function DayGroup({ dayKey, label, items, runningEntry }: DayGroupProps) 
   const dayUnits = useSyncPlan().units.filter((unit) => unit.day === dayKey);
   const unsynced = dayUnits.filter((unit) => unit.status !== "synced");
   const daySynced = dayUnits.length > 0 && unsynced.length === 0;
+  const daySent = dayUnits.some((unit) => unit.reuse);
 
   async function handleSendDay() {
     const toSend = daySynced ? dayUnits : unsynced;
     const hours = formatDurationHuman(toSend.reduce((sum, unit) => sum + unit.totalSeconds, 0));
+    const changed = toSend.filter((unit) => unit.status === "changed").length;
     const ok = await confirm(
-      t(daySynced ? "proofhub.resendDayConfirm" : "proofhub.sendDayConfirm", { count: toSend.length, hours }),
+      t(daySynced ? "proofhub.resendDayConfirm" : changed ? "proofhub.sendDayChangedConfirm" : "proofhub.sendDayConfirm", {
+        count: toSend.length,
+        hours,
+        changed,
+      }),
     );
     if (!ok) return;
 
@@ -72,6 +79,18 @@ export function DayGroup({ dayKey, label, items, runningEntry }: DayGroupProps) 
     const errors = await sendUnits(toSend);
     setSendingDay(false);
     if (errors.length > 0) setSendError(t("proofhub.sendDayFailure", { count: errors.length, message: errors[0] }));
+  }
+
+  async function handleCheckDay() {
+    setCheckingDay(true);
+    setSendError(null);
+    try {
+      await checkUnits(dayUnits);
+    } catch (err) {
+      setSendError(t("proofhub.checkFailure", { message: String(err) }));
+    } finally {
+      setCheckingDay(false);
+    }
   }
 
   async function handleCopyDay() {
@@ -109,15 +128,31 @@ export function DayGroup({ dayKey, label, items, runningEntry }: DayGroupProps) 
               disabled={sendingDay}
               aria-label={t(daySynced ? "proofhub.resendDay" : "proofhub.sendDay")}
               title={t(daySynced ? "proofhub.resendDay" : "proofhub.sendDay")}
-              className="rounded-[2px] p-1 text-[var(--color-text-muted)] opacity-0 outline-none transition-opacity hover:bg-[var(--color-border)] focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)] group-hover:opacity-100"
+              className="group/send rounded-[2px] p-1 text-[var(--color-text-muted)] opacity-0 outline-none transition-opacity hover:bg-[var(--color-border)] focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)] group-hover:opacity-100"
             >
               {sendingDay ? (
                 <Loader2 size={12} className="animate-spin" />
               ) : daySynced ? (
-                <Check size={12} className="text-[var(--color-accent)]" />
+                // A checkmark doesn't look clickable, so hovering shows what a click does.
+                <>
+                  <Check size={12} className="text-[var(--color-accent)] group-hover/send:hidden group-focus-visible/send:hidden" />
+                  <RefreshCw size={12} className="hidden group-hover/send:block group-focus-visible/send:block" />
+                </>
               ) : (
                 <Send size={12} />
               )}
+            </button>
+          )}
+          {daySent && (
+            <button
+              type="button"
+              onClick={handleCheckDay}
+              disabled={checkingDay}
+              aria-label={t("proofhub.checkDay")}
+              title={t("proofhub.checkDay")}
+              className="rounded-[2px] p-1 text-[var(--color-text-muted)] opacity-0 outline-none transition-opacity hover:bg-[var(--color-border)] focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)] group-hover:opacity-100"
+            >
+              {checkingDay ? <Loader2 size={12} className="animate-spin" /> : <SearchCheck size={12} />}
             </button>
           )}
         </span>

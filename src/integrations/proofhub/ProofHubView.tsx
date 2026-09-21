@@ -11,6 +11,12 @@ import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
 import { Switch } from "../../components/ui/Switch";
 import { cn } from "../../lib/cn";
+import { dayKey } from "../../lib/time";
+import { checkUnits, useSyncPlan } from "./sync";
+import { applyRemoteCheck } from "./plan";
+
+/** How far back "check sent entries" looks — deletions in ProofHub rarely happen later than that. */
+const CHECK_DAYS = 30;
 
 /**
  * Dedicated top-level tab for ProofHub, only reachable once the plugin is
@@ -35,6 +41,10 @@ export function ProofHubView() {
   const [debugLogOpen, setDebugLogOpen] = useState(false);
   const [debugLog, setDebugLog] = useState("");
   const [debugCopied, setDebugCopied] = useState(false);
+  const plan = useSyncPlan();
+  const [checking, setChecking] = useState(false);
+  const [checkResult, setCheckResult] = useState<string | null>(null);
+  const [checkError, setCheckError] = useState<string | null>(null);
 
   useEffect(() => {
     if (proofhub.subdomain && !proofhub.remoteProjects) {
@@ -50,6 +60,29 @@ export function ProofHubView() {
       setApiKeyInput("");
     } catch (err) {
       setConnectError(String(err));
+    }
+  };
+
+  const handleCheckSent = async () => {
+    setChecking(true);
+    setCheckResult(null);
+    setCheckError(null);
+    try {
+      const since = dayKey(new Date(Date.now() - CHECK_DAYS * 86_400_000).toISOString());
+      const units = plan.units.filter((unit) => unit.reuse && unit.day >= since);
+      await checkUnits(units);
+      const checked = applyRemoteCheck(units, useProofHubStore.getState().remoteEntries);
+      const missing = checked.filter((unit) => unit.status === "missing").length;
+      const changed = checked.filter((unit) => unit.status === "changed").length;
+      setCheckResult(
+        missing || changed
+          ? t("proofhub.checkSentFound", { missing, changed })
+          : t("proofhub.checkSentNothing", { count: units.length }),
+      );
+    } catch (err) {
+      setCheckError(t("proofhub.checkFailure", { message: String(err) }));
+    } finally {
+      setChecking(false);
     }
   };
 
@@ -140,6 +173,23 @@ export function ProofHubView() {
               onChange={proofhub.setGroupPushesByDay}
               label={t("proofhub.groupPushesByDay")}
             />
+          </div>
+
+          <div className="rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm">{t("proofhub.checkSent")}</p>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  {t("proofhub.checkSentDescription", { days: CHECK_DAYS })}
+                </p>
+              </div>
+              <Button variant="secondary" size="sm" onClick={handleCheckSent} disabled={checking}>
+                {checking && <Loader2 size={13} className="animate-spin" />}
+                {checking ? t("proofhub.checking") : t("proofhub.check")}
+              </Button>
+            </div>
+            {checkResult && <p className="mt-2 text-xs text-[var(--color-text-muted)]">{checkResult}</p>}
+            {checkError && <p className="mt-2 text-xs text-[var(--color-danger)]">{checkError}</p>}
           </div>
 
           <div className="flex items-center justify-between">

@@ -17,6 +17,7 @@ use reqwest::blocking::{Client, Response};
 use reqwest::{Method, StatusCode};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::io::{Read, Write};
 
 const USER_AGENT: &str = "Chronos (richardson.saconi@outlook.com)";
@@ -66,6 +67,15 @@ enum Request {
         list_id: Option<String>,
         task_id: Option<String>,
     },
+    /// Reports whether each given time entry still exists in ProofHub, and
+    /// its logged time/date if so — how Chronos notices entries deleted or
+    /// edited there by hand (ProofHub has no webhooks).
+    #[serde(rename_all = "camelCase")]
+    CheckEntries {
+        subdomain: String,
+        api_key: String,
+        entries: Vec<EntryRef>,
+    },
     /// Removes a time entry Chronos created earlier that no longer
     /// represents anything (see `planDay` in src/integrations/proofhub/plan.ts).
     /// Already-gone entries count as success.
@@ -77,6 +87,14 @@ enum Request {
         timesheet_id: String,
         time_id: String,
     },
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EntryRef {
+    project_id: String,
+    timesheet_id: String,
+    time_id: String,
 }
 
 struct PluginError {
@@ -281,6 +299,50 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
             // ProofHub echoed back for list_id/task_id.
             Ok(json!({ "id": id, "raw": raw }))
         }
+        Request::CheckEntries {
+            subdomain,
+            api_key,
+            entries,
+        } => {
+            // One listing per timesheet covers most ids in a single request.
+            // Whether that listing pages isn't confirmed, so an id missing
+            // from it is looked up on its own (the confirmed-behaviour check
+            // in `time_entry_exists`) before being reported as deleted.
+            let mut listings: HashMap<String, HashMap<String, Value>> = HashMap::new();
+            let mut results = Vec::with_capacity(entries.len());
+            for entry in entries {
+                let collection = format!("/projects/{}/timesheets/{}/time", entry.project_id, entry.timesheet_id);
+                if !listings.contains_key(&collection) {
+                    let body = get(client, &subdomain, &api_key, &collection)?;
+                    let by_id = extract_list(&body, &["time_entries"])
+                        .into_iter()
+                        .map(|item| (stringify_id(item.get("id")), item.clone()))
+                        .collect();
+                    listings.insert(collection.clone(), by_id);
+                }
+                let found = match listings[&collection].get(&entry.time_id) {
+                    Some(item) => Some(item.clone()),
+                    None => {
+                        let body = get(client, &subdomain, &api_key, &format!("{collection}/{}", entry.time_id))?;
+                        (stringify_id(body.get("id")) == entry.time_id).then_some(body)
+                    }
+                };
+                results.push(json!({
+                    "projectId": entry.project_id,
+                    "timesheetId": entry.timesheet_id,
+                    "timeId": entry.time_id,
+                    "exists": found.is_some(),
+                    "loggedHours": found.as_ref().and_then(|f| as_number(f.get("logged_hours"))),
+                    "loggedMins": found.as_ref().and_then(|f| as_number(f.get("logged_mins"))),
+                    "date": found
+                        .as_ref()
+                        .and_then(|f| f.get("date"))
+                        .and_then(Value::as_str)
+                        .map(|d| d.chars().take(10).collect::<String>()),
+                }));
+            }
+            Ok(Value::Array(results))
+        }
         Request::DeleteEntry {
             subdomain,
             api_key,
@@ -442,6 +504,15 @@ fn normalize_item(item: &Value) -> Value {
         "id": stringify_id(item.get("id")),
         "title": item.get("title").and_then(Value::as_str).unwrap_or("").to_string(),
     })
+}
+
+/// A count ProofHub may send as a number or a numeric string.
+fn as_number(value: Option<&Value>) -> Option<u64> {
+    match value {
+        Some(Value::Number(n)) => n.as_u64(),
+        Some(Value::String(s)) => s.trim().parse().ok(),
+        _ => None,
+    }
 }
 
 fn stringify_id(value: Option<&Value>) -> String {
