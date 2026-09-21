@@ -15,6 +15,7 @@ import { useTagsStore } from "./store/useTagsStore";
 import { useUpdaterStore } from "./store/useUpdaterStore";
 import { useAppSettingsStore } from "./store/useAppSettingsStore";
 import { useProofHubStore } from "./integrations/proofhub/useProofHubStore";
+import { AUTO_CHECK_INTERVAL_MS, autoCheckRecent } from "./integrations/proofhub/sync";
 import { runAutoBackupIfDue } from "./lib/autoBackup";
 import { nowIso } from "./lib/time";
 
@@ -47,6 +48,16 @@ function App() {
     // all. Actual ProofHub data fetches only happen inside ProofHubView.
     useProofHubStore.getState().load();
   }, [loadProjects, loadEntries, loadTags]);
+
+  // Once entries are loaded (and again periodically), confirm what was sent
+  // to ProofHub is still there — see autoCheckRecent.
+  const proofhubLoaded = useProofHubStore((s) => s.loaded);
+  useEffect(() => {
+    if (!loaded || !proofhubLoaded) return;
+    autoCheckRecent();
+    const id = setInterval(autoCheckRecent, AUTO_CHECK_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [loaded, proofhubLoaded]);
 
   useEffect(() => {
     runAutoBackupIfDue();

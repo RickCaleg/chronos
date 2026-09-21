@@ -555,9 +555,13 @@ logged by hand in ProofHub, or left behind by a send Chronos has since
 forgotten — each deletable there. The listing endpoint documents no paging;
 if it turns out to page, only the first page is seen.
 
-Checks only run when asked: the day header's check button, "Check" in the
-edit popover, and "Check sent entries" in the ProofHub tab (units sent in
-the last 30 days). No background polling, in the same spirit as §8.4.
+Checks also run on their own (`autoCheckRecent`): once the app has loaded
+its entries, and every 30 minutes while it stays open, for units sent in
+the last 30 days, and only when the plugin is installed and connected. The
+automatic check covers the Chronos → ProofHub direction only, stays quiet
+on errors, and skips while a send is in flight. By hand: the day header's
+check button, "Check" in the edit popover, and "Check" in the ProofHub
+tab, which also looks the other way.
 
 ## 9. Error handling
 

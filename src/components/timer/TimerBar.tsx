@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ClipboardEvent, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Play, Square, Trash2 } from "lucide-react";
 import { useEntriesStore } from "../../store/useEntriesStore";
@@ -20,6 +20,7 @@ export function TimerBar() {
   const [draft, setDraft] = useState("");
   const [projectId, setProjectId] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const barRef = useRef<HTMLDivElement>(null);
   const suggestions = useSuggestions();
   const suggestionByDisplay = useMemo(() => new Map(suggestions.map((s) => [s.display, s])), [suggestions]);
 
@@ -39,6 +40,14 @@ export function TimerBar() {
 
   useEffect(() => {
     function handleGlobalKeyDown(e: globalThis.KeyboardEvent) {
+      // Ctrl+Enter starts/stops the timer from anywhere — except while
+      // typing in some other field (an edit popover, a note, the palette),
+      // where it means "save this" and already did: acting on it too started
+      // an empty timer, or stopped the running one.
+      if (e.defaultPrevented) return;
+      const target = e.target as HTMLElement | null;
+      const editable = target?.closest("input, textarea, select, [contenteditable='true']");
+      if (editable && (!barRef.current?.contains(editable) || editable.closest("[data-floating-panel]"))) return;
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
         if (isRunning) stop();
@@ -57,7 +66,9 @@ export function TimerBar() {
   }
 
   function handleStartKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter" && !isRunning) handleStart();
+    // An empty field + Enter is almost always a stray key, not "start a timer
+    // with no description" — that's still one click on ▶ (or Ctrl+Enter) away.
+    if (e.key === "Enter" && !isRunning && draft.trim()) handleStart();
   }
 
   function handleCombinedChange(raw: string) {
@@ -94,7 +105,10 @@ export function TimerBar() {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+    <div
+      ref={barRef}
+      className="flex flex-wrap items-center gap-2 rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-3"
+    >
       <AutocompleteInput
         value={combinedValue}
         onChange={handleCombinedChange}

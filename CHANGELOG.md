@@ -4,6 +4,10 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Added
+- Chronos checks ProofHub on its own for sent entries that were deleted or changed there: when the app opens, and every 30 minutes while it's open, for the last 30 days. Such entries turn red without anyone clicking "Check". Only when the ProofHub plugin is connected. It's a few requests per run.
+### Fixed
+- Pressing Ctrl+Enter while editing (saving a note, a form in a popover, the command palette) also started an empty timer, or stopped the running one. The Ctrl+Enter timer shortcut now ignores keys typed in other fields. Enter in an empty timer field no longer starts a timer with no description either.
 
 ## [0.5.11] - 2026-09-21
 ### Added

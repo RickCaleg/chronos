@@ -254,3 +254,35 @@ export async function deleteRemoteEntry(ref: RemoteRef): Promise<void> {
     timeId: ref.timeId,
   });
 }
+
+/** How far back the automatic check looks — the same window as the ProofHub tab. */
+const AUTO_CHECK_DAYS = 30;
+/** Between automatic checks while the app stays open. */
+export const AUTO_CHECK_INTERVAL_MS = 30 * 60 * 1000;
+let autoCheckRunning = false;
+
+/**
+ * Quietly checks what was sent in the last 30 days (see `checkUnits`), so an
+ * entry deleted or edited in ProofHub turns red on its own instead of
+ * showing a stale checkmark. Runs when the app opens and every
+ * AUTO_CHECK_INTERVAL_MS; does nothing unless the plugin is installed and
+ * connected, skips while a send is in flight, and never surfaces errors —
+ * the manual "Check" buttons are there for that.
+ */
+export async function autoCheckRecent(): Promise<void> {
+  const { installed, subdomain, projectMap, groupPushesByDay, sending } = useProofHubStore.getState();
+  if (!installed || !subdomain || autoCheckRunning || Object.keys(sending).length > 0) return;
+  const since = formatLocalDate(new Date(Date.now() - AUTO_CHECK_DAYS * 86_400_000).toISOString());
+  const units = planSync(useEntriesStore.getState().entries, projectMap, groupPushesByDay).filter(
+    (unit) => unit.reuse && unit.day >= since,
+  );
+  if (units.length === 0) return;
+  autoCheckRunning = true;
+  try {
+    await checkUnits(units);
+  } catch {
+    // Offline, ProofHub down, plugin mid-update: the next run tries again.
+  } finally {
+    autoCheckRunning = false;
+  }
+}

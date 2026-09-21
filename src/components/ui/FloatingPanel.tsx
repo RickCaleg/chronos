@@ -43,6 +43,8 @@ export function FloatingPanel({ open, onClose, children, align = "left", classNa
   return (
     <div
       ref={ref}
+      // Lets global shortcuts tell typing in a panel from typing in its host (see TimerBar).
+      data-floating-panel=""
       className={cn(
         "absolute top-full z-50 mt-2 rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-md",
         align === "right" ? "right-0" : "left-0",
