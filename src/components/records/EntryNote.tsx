@@ -8,10 +8,22 @@ import { cn } from "../../lib/cn";
 const iconButtonClass =
   "shrink-0 rounded-[2px] p-1.5 text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-border)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)]";
 
-/** The row's toggle for its note editor; accent-coloured when the entry has a note. */
-export function NoteButton({ entry, onClick }: { entry: TimeEntry; onClick: () => void }) {
+/**
+ * What a set of entries (one row, or a whole group) has as its note: the
+ * shared note, or `mixed` when they differ — a group row can only show and
+ * edit one note for all of its entries.
+ */
+function sharedNote(entries: TimeEntry[]): { note: string | null; mixed: boolean } {
+  const notes = new Set(entries.map((e) => e.note?.trim() || ""));
+  if (notes.size > 1) return { note: null, mixed: true };
+  const [only] = notes;
+  return { note: only || null, mixed: false };
+}
+
+/** The row's toggle for its note editor; accent-coloured when there's a note. */
+export function NoteButton({ entries, onClick }: { entries: TimeEntry[]; onClick: () => void }) {
   const { t } = useTranslation();
-  const hasNote = !!entry.note?.trim();
+  const hasNote = entries.some((e) => e.note?.trim());
   const label = hasNote ? t("records.editNote") : t("records.addNote");
   return (
     <button
@@ -27,43 +39,72 @@ export function NoteButton({ entry, onClick }: { entry: TimeEntry; onClick: () =
 }
 
 /**
- * A row's note, shown in small text under it — free text about what was
- * done, sent to ProofHub instead of the entry's name (see `unitDescription`
- * in integrations/proofhub/plan.ts). Clicking it, or the row's
- * NoteButton, edits it in place.
+ * The note of a row — or of a group row, where it's the note of every entry
+ * in the group — shown in small text under it. It's free text about what
+ * was done, sent to ProofHub as the description (see `unitDescription` in
+ * integrations/proofhub/plan.ts). Clicking it, or the row's NoteButton,
+ * edits it in place.
  */
 export function EntryNote({
-  entry,
+  entries,
   editing,
   onEditingChange,
 }: {
-  entry: TimeEntry;
+  entries: TimeEntry[];
   editing: boolean;
   onEditingChange: (editing: boolean) => void;
 }) {
   const { t } = useTranslation();
-  const note = entry.note?.trim() || null;
+  const update = useEntriesStore((s) => s.update);
+  const { note, mixed } = sharedNote(entries);
 
-  if (editing) return <NoteEditor entry={entry} onDone={() => onEditingChange(false)} />;
-  if (!note) return null;
+  function save(next: string | null) {
+    for (const entry of entries) {
+      if ((entry.note?.trim() || null) !== next) update(entry.id, { note: next });
+    }
+  }
+
+  if (editing) {
+    return (
+      <NoteEditor
+        initial={note ?? ""}
+        hint={mixed ? t("records.groupNoteReplaces", { count: entries.length }) : undefined}
+        onSave={save}
+        onDone={() => onEditingChange(false)}
+      />
+    );
+  }
+  if (!note && !mixed) return null;
 
   return (
     <button
       type="button"
       onClick={() => onEditingChange(true)}
       title={t("records.editNote")}
-      className="block w-full whitespace-pre-wrap break-words px-3 pb-2 text-left text-xs text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)]"
+      className={cn(
+        "block w-full whitespace-pre-wrap break-words pb-2 pl-10 pr-3 text-left text-xs text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)]",
+        mixed && "italic",
+      )}
     >
-      {note}
+      {mixed ? t("records.groupNotesDiffer") : note}
     </button>
   );
 }
 
 /** Ctrl+Enter or leaving the field saves, Esc cancels. */
-function NoteEditor({ entry, onDone }: { entry: TimeEntry; onDone: () => void }) {
+function NoteEditor({
+  initial,
+  hint,
+  onSave,
+  onDone,
+}: {
+  initial: string;
+  hint?: string;
+  onSave: (note: string | null) => void;
+  onDone: () => void;
+}) {
   const { t } = useTranslation();
-  const update = useEntriesStore((s) => s.update);
-  const [draft, setDraft] = useState(entry.note ?? "");
+  const [draft, setDraft] = useState(initial);
   // Set once saved or cancelled, so the blur some engines fire as the
   // field unmounts can't save a second time (or save a cancelled edit).
   const done = useRef(false);
@@ -71,8 +112,9 @@ function NoteEditor({ entry, onDone }: { entry: TimeEntry; onDone: () => void })
   function save() {
     if (done.current) return;
     done.current = true;
-    const next = draft.trim() || null;
-    if (next !== (entry.note?.trim() || null)) update(entry.id, { note: next });
+    // Untouched means unchanged — so a mixed group's empty field left as is
+    // keeps each entry's own note.
+    if (draft !== initial) onSave(draft.trim() || null);
     onDone();
   }
 
@@ -88,7 +130,7 @@ function NoteEditor({ entry, onDone }: { entry: TimeEntry; onDone: () => void })
   }
 
   return (
-    <div className="px-3 pb-2">
+    <div className="pb-2 pl-10 pr-3">
       <textarea
         autoFocus
         value={draft}
@@ -100,7 +142,7 @@ function NoteEditor({ entry, onDone }: { entry: TimeEntry; onDone: () => void })
         placeholder={t("records.notePlaceholder")}
         className="block w-full resize-y rounded-[2px] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-xs text-[var(--color-text)] outline-none transition-colors placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent)]"
       />
-      <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">{t("records.noteHint")}</p>
+      <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">{hint ?? t("records.noteHint")}</p>
     </div>
   );
 }

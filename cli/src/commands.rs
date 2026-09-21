@@ -20,6 +20,7 @@ pub fn run(conn: &Connection, command: Command) -> Result<()> {
             cmd_start(conn, description, task, project, at, tags, note)
         }
         Command::Stop => cmd_stop(conn),
+        Command::Discard { yes } => cmd_discard(conn, yes),
         Command::Restart { id } => cmd_restart(conn, id),
         Command::Status { json } => cmd_status(conn, json),
         Command::List { today, yesterday, date, from, to, project, tag, json, summary } => {
@@ -245,6 +246,23 @@ fn cmd_stop(conn: &Connection) -> Result<()> {
         running.description,
         timefmt::format_duration_human(duration)
     );
+    Ok(())
+}
+
+fn cmd_discard(conn: &Connection, yes: bool) -> Result<()> {
+    let running = get_running_entry(conn)?.ok_or_else(|| anyhow!("no timer is running"))?;
+    let elapsed = timefmt::duration_between(&running.start_time, &timefmt::now_iso())?;
+    require_confirm(
+        yes,
+        &format!(
+            "Discard \"{}\"? Its {} won't be saved.",
+            running.description,
+            timefmt::format_duration_human(elapsed)
+        ),
+    )?;
+    conn.execute("DELETE FROM entry_tags WHERE entry_id = ?1", params![running.id])?;
+    conn.execute("DELETE FROM time_entries WHERE id = ?1", params![running.id])?;
+    println!("Discarded \"{}\"", running.description);
     Ok(())
 }
 

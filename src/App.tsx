@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { TopNav, type View } from "./components/TopNav";
 import { CommandPalette } from "./components/CommandPalette";
+import { ConfirmDialog } from "./components/ui/ConfirmDialog";
 import { TimerBar } from "./components/timer/TimerBar";
 import { RecordsView } from "./components/records/RecordsView";
 import { ProjectsView } from "./components/projects/ProjectsView";
@@ -119,6 +120,7 @@ function App() {
       </main>
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onNavigate={setView} />
+      <ConfirmDialog />
     </div>
   );
 }

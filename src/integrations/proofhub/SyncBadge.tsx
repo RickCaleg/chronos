@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, Check, RefreshCw, Send, Loader2 } from "lucide-react";
-import { confirm } from "@tauri-apps/plugin-dialog";
+import { confirm } from "../../components/ui/ConfirmDialog";
 import type { TimeEntry } from "../../types";
 import { formatDurationHuman } from "../../lib/time";
 import { sendUnits, useSyncPlan } from "./sync";
@@ -45,11 +45,12 @@ export const statusLabelKey: Record<UnitStatus, string> = {
 export async function sendWithConfirm(units: SyncUnit[], t: (key: string) => string): Promise<void> {
   const toSend = units.filter((unit) => unit.status !== "synced");
   if (toSend.length === 0) {
-    if (!(await confirm(t("proofhub.resendConfirm")))) return;
+    if (!(await confirm(t("proofhub.resendConfirm"), { confirmLabel: t("proofhub.resend") }))) return;
     await sendUnits(units);
     return;
   }
-  if (toSend.some((unit) => unit.status === "changed") && !(await confirm(t("proofhub.changedConfirm")))) return;
+  const overwrites = toSend.some((unit) => unit.status === "changed");
+  if (overwrites && !(await confirm(t("proofhub.changedConfirm"), { confirmLabel: t("proofhub.overwrite") }))) return;
   await sendUnits(toSend);
 }
 

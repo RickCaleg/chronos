@@ -444,3 +444,21 @@ fn a_database_the_app_has_not_migrated_yet_works_without_the_note_column() {
         .unwrap();
     assert!(!has_note, "the CLI must not add the column to an existing table");
 }
+
+#[test]
+fn discard_throws_the_running_timer_away() {
+    let db = TestDb::new();
+    db.ok(&["add", "Kept", "--start", "09:00", "--end", "10:00"]);
+    db.ok(&["start", "Oops", "--tags", "x"]);
+
+    let declined = db.run_with_stdin(&["discard"], Some("n\n"));
+    assert!(!declined.status.success());
+    assert_eq!(db.list_json().as_array().unwrap().len(), 2);
+
+    db.ok(&["discard", "--yes"]);
+    let entries = db.list_json();
+    assert_eq!(entries.as_array().unwrap().len(), 1);
+    assert_eq!(entries[0]["description"], "Kept");
+    assert!(db.ok(&["status"]).contains("No timer running."));
+    assert!(!db.run(&["discard", "--yes"]).status.success());
+}

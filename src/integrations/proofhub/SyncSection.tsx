@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { confirm } from "@tauri-apps/plugin-dialog";
+import { confirm } from "../../components/ui/ConfirmDialog";
 import type { TimeEntry } from "../../types";
 import { Button } from "../../components/ui/Button";
 import { checkUnits, forgetUnit } from "./sync";
@@ -49,7 +49,7 @@ export function SyncSection({ entry }: { entry: TimeEntry }) {
   }
 
   async function handleForget() {
-    if (await confirm(t("proofhub.forgetConfirm"))) await forgetUnit(unit);
+    if (await confirm(t("proofhub.forgetConfirm"), { danger: true, confirmLabel: t("proofhub.forget") })) await forgetUnit(unit);
   }
 
   return (

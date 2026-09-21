@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, Copy, Loader2, RefreshCw, SearchCheck, Send } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { confirm } from "@tauri-apps/plugin-dialog";
+import { confirm } from "../ui/ConfirmDialog";
 import type { Project, TimeEntry } from "../../types";
 import type { EntryOrGroup } from "../../lib/grouping";
 import { EntryRow } from "./EntryRow";
@@ -71,6 +71,7 @@ export function DayGroup({ dayKey, label, items, runningEntry }: DayGroupProps) 
         hours,
         changed,
       }),
+      { confirmLabel: t(daySynced ? "proofhub.resend" : "proofhub.send") },
     );
     if (!ok) return;
 

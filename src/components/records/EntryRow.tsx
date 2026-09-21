@@ -1,14 +1,15 @@
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Copy, Play, Trash2 } from "lucide-react";
+import { Check, Copy, Trash2 } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { confirm } from "@tauri-apps/plugin-dialog";
+import { confirm } from "../ui/ConfirmDialog";
 import type { TimeEntry } from "../../types";
 import { useProjectsStore } from "../../store/useProjectsStore";
 import { useEntriesStore } from "../../store/useEntriesStore";
 import { EntryEditPopover } from "./EntryEditPopover";
 import { EntryNote, NoteButton } from "./EntryNote";
-import { formatDurationHuman, formatTimeShort, nowIso } from "../../lib/time";
+import { RestartButton } from "./RestartButton";
+import { formatDurationHuman, formatTimeShort } from "../../lib/time";
 import { projectLabel } from "../../lib/projectLabel";
 import { SyncBadge } from "../../integrations/proofhub/SyncBadge";
 import i18n from "../../i18n";
@@ -19,7 +20,7 @@ const iconButtonClass =
 export function EntryRow({ entry }: { entry: TimeEntry }) {
   const { t } = useTranslation();
   const { projects } = useProjectsStore();
-  const { update, remove, start, stop, runningEntry } = useEntriesStore();
+  const { update, remove } = useEntriesStore();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [editingNote, setEditingNote] = useState(false);
@@ -33,7 +34,7 @@ export function EntryRow({ entry }: { entry: TimeEntry }) {
   }
 
   async function handleDelete() {
-    if (await confirm(t("records.deleteConfirm"))) {
+    if (await confirm(t("records.deleteConfirm"), { danger: true, confirmLabel: t("editor.delete") })) {
       remove(entry.id);
       setOpen(false);
     }
@@ -46,24 +47,16 @@ export function EntryRow({ entry }: { entry: TimeEntry }) {
     setTimeout(() => setCopied(false), 1500);
   }
 
-  async function handleRestart() {
-    if (runningEntry) await stop();
-    await start({
-      description: entry.description,
-      taskNumber: entry.taskNumber,
-      projectId: entry.projectId,
-      startTime: nowIso(),
-    });
-  }
-
   return (
-    <div className="relative hover:bg-[var(--color-surface-hover)]">
+    <div className="group/row relative hover:bg-[var(--color-surface-hover)]">
       <div className="flex items-center gap-1">
+        <RestartButton entry={entry} />
+
         <button
           ref={triggerRef}
           type="button"
           onClick={() => setOpen(true)}
-          className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 rounded-[2px] px-3 py-2 text-left outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)]"
+          className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 rounded-[2px] py-2 pl-1 pr-3 text-left outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)]"
         >
           <span className="flex min-w-0 basis-full items-center gap-2 sm:basis-auto sm:flex-1">
             {entry.taskNumber && (
@@ -112,19 +105,9 @@ export function EntryRow({ entry }: { entry: TimeEntry }) {
           </span>
         </button>
 
-        <NoteButton entry={entry} onClick={() => setEditingNote(true)} />
+        <NoteButton entries={[entry]} onClick={() => setEditingNote(true)} />
 
         <SyncBadge entries={[entry]} />
-
-        <button
-          type="button"
-          onClick={handleRestart}
-          aria-label={t("records.restart")}
-          title={t("records.restart")}
-          className={`${iconButtonClass} hover:text-[var(--color-accent)]`}
-        >
-          <Play size={14} />
-        </button>
 
         <button type="button" onClick={handleCopy} aria-label={t("records.copy")} className={iconButtonClass}>
           {copied ? <Check size={14} className="text-[var(--color-accent)]" /> : <Copy size={14} />}
@@ -140,7 +123,7 @@ export function EntryRow({ entry }: { entry: TimeEntry }) {
         </button>
       </div>
 
-      <EntryNote entry={entry} editing={editingNote} onEditingChange={setEditingNote} />
+      <EntryNote entries={[entry]} editing={editingNote} onEditingChange={setEditingNote} />
 
       <EntryEditPopover
         open={open}

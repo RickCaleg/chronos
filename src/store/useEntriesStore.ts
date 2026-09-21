@@ -18,6 +18,8 @@ interface EntriesState {
   load: () => Promise<void>;
   start: (input: entriesDb.StartEntryInput) => Promise<void>;
   stop: () => Promise<void>;
+  /** Stops the running timer without keeping it: the entry is deleted. */
+  discard: () => Promise<void>;
   setRunningStart: (startTime: string) => Promise<void>;
   update: (id: string, patch: EntryPatch) => Promise<void>;
   setEntryTags: (id: string, tags: Tag[]) => Promise<void>;
@@ -54,6 +56,14 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
       ),
       runningEntry: null,
     });
+    syncTrayLabel(false);
+  },
+
+  discard: async () => {
+    const running = get().runningEntry;
+    if (!running) return;
+    await entriesDb.deleteEntry(running.id);
+    set({ entries: get().entries.filter((e) => e.id !== running.id), runningEntry: null });
     syncTrayLabel(false);
   },
 

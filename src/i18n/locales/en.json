@@ -17,7 +17,8 @@
     "goSettings": "Go to Settings",
     "exportBackup": "Export full backup (JSON)",
     "importBackup": "Import backup (JSON)",
-    "checkUpdates": "Check for updates"
+    "checkUpdates": "Check for updates",
+    "discardTimer": "Discard timer (don't save)"
   },
   "timer": {
     "combinedPlaceholder": "What are you working on? Type # for a task number",
@@ -25,7 +26,9 @@
     "start": "Start",
     "stop": "Stop",
     "editStart": "Edit start time",
-    "runningSince": "Running since {{time}}"
+    "runningSince": "Running since {{time}}",
+    "discard": "Discard timer",
+    "discardConfirm": "Discard \"{{description}}\"? Its {{elapsed}} won't be saved."
   },
   "records": {
     "empty": "No time entries yet. Start the timer to create your first one.",
@@ -42,10 +45,10 @@
     "note": "Note",
     "addNote": "Add a note",
     "notePlaceholder": "What was done…",
-    "noteHint": "Sent to ProofHub instead of the entry's name; in a grouped push, an entry with a note goes on its own. Ctrl+Enter or clicking away saves, Esc cancels.",
-    "groupNotes": "{{count}} with a note — open the group to edit",
-    "groupAddNote": "Notes are per entry — open the group to add one",
-    "editNote": "Edit note"
+    "noteHint": "Sent to ProofHub as the description; in a grouped push, entries with the same note are summed. Ctrl+Enter or clicking away saves, Esc cancels.",
+    "editNote": "Edit note",
+    "groupNotesDiffer": "The entries in this group have different notes — click to set one for all",
+    "groupNoteReplaces": "Replaces the notes of all {{count}} entries in this group (leave it untouched to keep them). Ctrl+Enter or clicking away saves, Esc cancels."
   },
   "editor": {
     "taskDescription": "Task & description",
@@ -215,8 +218,18 @@
     "checkFailure": "Couldn't check ProofHub: {{message}}",
     "sendDayChangedConfirm": "Send {{count}} ProofHub entries ({{hours}} in total)? {{changed}} of them were changed in ProofHub and will be overwritten.",
     "checkSent": "Check sent entries",
-    "checkSentDescription": "Looks up everything sent in the last {{days}} days and marks what was deleted or changed in ProofHub, so it can be sent again.",
+    "checkSentDescription": "Compares the last {{days}} days both ways: marks what you sent that was deleted or changed in ProofHub, and lists your ProofHub entries that Chronos didn't send.",
     "checkSentFound": "Found in ProofHub: {{missing}} deleted, {{changed}} changed. They're marked in the timer tab.",
-    "checkSentNothing": "All {{count}} sent entries are still in ProofHub as sent."
+    "checkSentNothing": "All {{count}} sent entries are still in ProofHub as sent.",
+    "overwrite": "Overwrite",
+    "remoteOnlyTitle": "Only in ProofHub ({{count}})",
+    "remoteOnlyHint": "Your entries in the mapped timesheets that no Chronos entry was sent as — logged by hand there, or left over from an old send. Teammates' entries are ignored.",
+    "remoteOnlyNone": "Nothing in ProofHub that isn't in Chronos.",
+    "remoteOnlyOnTask": "(logged on a task, no description)",
+    "remoteOnlyDelete": "Delete in ProofHub",
+    "remoteOnlyDeleteConfirm": "Delete the ProofHub entry of {{date}} ({{hours}})? This can't be undone in Chronos."
+  },
+  "confirm": {
+    "ok": "OK"
   }
 }

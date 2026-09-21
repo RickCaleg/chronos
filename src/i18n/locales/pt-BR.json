@@ -17,7 +17,8 @@
     "goSettings": "Ir para Configurações",
     "exportBackup": "Exportar backup completo (JSON)",
     "importBackup": "Importar backup (JSON)",
-    "checkUpdates": "Verificar atualizações"
+    "checkUpdates": "Verificar atualizações",
+    "discardTimer": "Descartar timer (sem salvar)"
   },
   "timer": {
     "combinedPlaceholder": "No que você está trabalhando? Digite # para número da task",
@@ -25,7 +26,9 @@
     "start": "Iniciar",
     "stop": "Parar",
     "editStart": "Editar hora de início",
-    "runningSince": "Rodando desde {{time}}"
+    "runningSince": "Rodando desde {{time}}",
+    "discard": "Descartar timer",
+    "discardConfirm": "Descartar \"{{description}}\"? Os {{elapsed}} registrados não serão salvos."
   },
   "records": {
     "empty": "Nenhum registro ainda. Inicie o timer para criar o primeiro.",
@@ -42,10 +45,10 @@
     "note": "Nota",
     "addNote": "Adicionar nota",
     "notePlaceholder": "O que foi feito…",
-    "noteHint": "Enviada ao ProofHub no lugar do nome; no envio agrupado, um lançamento com nota vai separado. Ctrl+Enter ou clicar fora salva, Esc cancela.",
-    "groupNotes": "{{count}} com nota — abra o grupo para editar",
-    "groupAddNote": "As notas são por lançamento — abra o grupo para adicionar",
-    "editNote": "Editar nota"
+    "noteHint": "Enviada ao ProofHub como descrição; no envio agrupado, lançamentos com a mesma nota são somados. Ctrl+Enter ou clicar fora salva, Esc cancela.",
+    "editNote": "Editar nota",
+    "groupNotesDiffer": "Os lançamentos deste grupo têm notas diferentes — clique para definir uma para todos",
+    "groupNoteReplaces": "Substitui as notas dos {{count}} lançamentos do grupo (deixe sem mexer para mantê-las). Ctrl+Enter ou clicar fora salva, Esc cancela."
   },
   "editor": {
     "taskDescription": "Task e descrição",
@@ -215,8 +218,18 @@
     "checkFailure": "Não foi possível verificar no ProofHub: {{message}}",
     "sendDayChangedConfirm": "Enviar {{count}} lançamentos ({{hours}} no total) para o ProofHub? {{changed}} deles foram alterados no ProofHub e serão sobrescritos.",
     "checkSent": "Verificar lançamentos enviados",
-    "checkSentDescription": "Confere tudo o que foi enviado nos últimos {{days}} dias e marca o que foi apagado ou alterado no ProofHub, para poder enviar de novo.",
+    "checkSentDescription": "Compara os últimos {{days}} dias nos dois sentidos: marca o que você enviou e foi apagado ou alterado no ProofHub, e lista os seus lançamentos no ProofHub que não vieram do Chronos.",
     "checkSentFound": "Encontrado no ProofHub: {{missing}} apagados, {{changed}} alterados. Estão marcados na aba do timer.",
-    "checkSentNothing": "Os {{count}} lançamentos enviados continuam no ProofHub como foram enviados."
+    "checkSentNothing": "Os {{count}} lançamentos enviados continuam no ProofHub como foram enviados.",
+    "overwrite": "Sobrescrever",
+    "remoteOnlyTitle": "Só no ProofHub ({{count}})",
+    "remoteOnlyHint": "Seus lançamentos nos timesheets mapeados que não correspondem a nenhum envio do Chronos — feitos à mão lá ou sobras de um envio antigo. Lançamentos de colegas são ignorados.",
+    "remoteOnlyNone": "Nada no ProofHub que não esteja no Chronos.",
+    "remoteOnlyOnTask": "(lançado numa task, sem descrição)",
+    "remoteOnlyDelete": "Apagar no ProofHub",
+    "remoteOnlyDeleteConfirm": "Apagar o lançamento do ProofHub de {{date}} ({{hours}})? Não dá para desfazer pelo Chronos."
+  },
+  "confirm": {
+    "ok": "OK"
   }
 }

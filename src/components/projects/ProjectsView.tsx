@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Archive, ArchiveRestore, Plus, Trash2 } from "lucide-react";
-import { confirm } from "@tauri-apps/plugin-dialog";
+import { confirm } from "../ui/ConfirmDialog";
 import { useProjectsStore } from "../../store/useProjectsStore";
 import { Input } from "../ui/Input";
 import { Button } from "../ui/Button";
@@ -15,7 +15,7 @@ function ProjectRow({ project }: { project: Project }) {
   const [alias, setAliasText] = useState(project.alias ?? "");
 
   async function handleDelete() {
-    if (await confirm(t("projects.deleteConfirm"))) remove(project.id);
+    if (await confirm(t("projects.deleteConfirm"), { danger: true, confirmLabel: t("editor.delete") })) remove(project.id);
   }
 
   return (

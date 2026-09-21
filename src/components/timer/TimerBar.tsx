@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Play, Square } from "lucide-react";
+import { Play, Square, Trash2 } from "lucide-react";
 import { useEntriesStore } from "../../store/useEntriesStore";
 import { useProjectsStore } from "../../store/useProjectsStore";
 import { ProjectPicker } from "./ProjectPicker";
 import { TimeAdjustPopover } from "./TimeAdjustPopover";
+import { discardRunningTimer } from "./discardTimer";
 import { AutocompleteInput } from "../ui/AutocompleteInput";
 import { durationBetween, formatClock, nowIso } from "../../lib/time";
 import { cn } from "../../lib/cn";
@@ -112,6 +113,17 @@ export function TimerBar() {
       <div className="ml-auto flex items-center gap-3">
         {isRunning && <TimeAdjustPopover startTime={runningEntry.startTime} onChange={setRunningStart} />}
         <span className="w-20 text-right font-mono text-lg tabular-nums">{formatClock(elapsed)}</span>
+        {isRunning && (
+          <button
+            type="button"
+            onClick={() => discardRunningTimer(t)}
+            aria-label={t("timer.discard")}
+            title={t("timer.discard")}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[2px] text-[var(--color-text-muted)] outline-none transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-danger)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)]"
+          >
+            <Trash2 size={16} />
+          </button>
+        )}
         <button
           type="button"
           onClick={isRunning ? stop : handleStart}

@@ -60,6 +60,7 @@ chronos-cli restart a1b2c3d4   # stops what's running and continues that entry, 
 chronos-cli status
 chronos-cli status --json
 chronos-cli stop
+chronos-cli discard --yes   # throws the running timer away, nothing saved
 ```
 
 - Only one timer can run at a time; `start` fails loudly if one is already running.

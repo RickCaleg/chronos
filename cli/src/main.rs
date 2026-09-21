@@ -53,6 +53,13 @@ pub enum Command {
     /// Stop the currently running timer
     Stop,
 
+    /// Throw away the running timer without saving it
+    Discard {
+        /// Skip the confirmation prompt
+        #[arg(long)]
+        yes: bool,
+    },
+
     /// Start a new timer with an existing entry's description, task and
     /// project (stopping the running one first, if any)
     Restart {

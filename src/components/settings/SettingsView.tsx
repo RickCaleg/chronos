@@ -1,7 +1,8 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Download, FileSpreadsheet, FolderOpen, RefreshCw, Save, Trash2, Upload } from "lucide-react";
-import { confirm, open as openDialog } from "@tauri-apps/plugin-dialog";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { confirm } from "../ui/ConfirmDialog";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { disable as disableAutostart, enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
@@ -154,7 +155,7 @@ export function SettingsView() {
   }
 
   async function handleReset() {
-    const confirmed = await confirm(t("settings.resetConfirm"), { kind: "warning" });
+    const confirmed = await confirm(t("settings.resetConfirm"), { danger: true, confirmLabel: t("settings.resetAll") });
     if (!confirmed) return;
     await run(async () => {
       await resetAllData();

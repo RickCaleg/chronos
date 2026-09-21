@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Settings,
   Square,
+  Trash2,
   Upload,
 } from "lucide-react";
 import type { View } from "./TopNav";
@@ -16,6 +17,7 @@ import { useEntriesStore } from "../store/useEntriesStore";
 import { useUpdaterStore } from "../store/useUpdaterStore";
 import { exportJsonBackup, importJsonBackup } from "../lib/exportImport";
 import { nowIso } from "../lib/time";
+import { discardRunningTimer } from "./timer/discardTimer";
 import { cn } from "../lib/cn";
 
 interface Command {
@@ -47,6 +49,12 @@ export function CommandPalette({ open, onClose, onNavigate }: CommandPaletteProp
         icon: Square,
         run: () => useEntriesStore.getState().stop(),
       });
+      list.push({
+        id: "discard-timer",
+        labelKey: "palette.discardTimer",
+        icon: Trash2,
+        run: () => discardRunningTimer(t),
+      });
     } else {
       list.push({
         id: "start-timer",
@@ -73,7 +81,7 @@ export function CommandPalette({ open, onClose, onNavigate }: CommandPaletteProp
       },
     );
     return list;
-  }, [runningEntry, onNavigate]);
+  }, [runningEntry, onNavigate, t]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
