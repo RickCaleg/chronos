@@ -11,14 +11,20 @@ interface FloatingPanelProps {
 
 export function FloatingPanel({ open, onClose, children, align = "left", className }: FloatingPanelProps) {
   const ref = useRef<HTMLDivElement>(null);
+  // Callers pass inline closures, so onClose changes identity on every
+  // parent render (e.g. each tick of a running timer). Read it through a ref
+  // so the effect below runs only on open — re-running it would steal focus
+  // back to the first field while the user is typing in another one.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
     function handlePointerDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      if (ref.current && !ref.current.contains(e.target as Node)) onCloseRef.current();
     }
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     }
     document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
@@ -30,7 +36,7 @@ export function FloatingPanel({ open, onClose, children, align = "left", classNa
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

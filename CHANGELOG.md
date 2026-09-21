@@ -4,6 +4,8 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Fixed
+- Editing a stopped entry while another timer was running: typing in the start (or end/duration) field sent the text to the description instead. The edit popup jumped focus back to its first field on every tick of the running timer; it now focuses it only when it opens.
 
 ## [0.5.6] - 2026-09-19
 ### Fixed
