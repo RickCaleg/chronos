@@ -462,3 +462,39 @@ fn discard_throws_the_running_timer_away() {
     assert!(db.ok(&["status"]).contains("No timer running."));
     assert!(!db.run(&["discard", "--yes"]).status.success());
 }
+
+#[test]
+fn edit_with_several_ids_applies_to_all_like_a_group() {
+    let db = TestDb::new();
+    db.ok(&["projects", "add", "Acme", "--alias", "ACM"]);
+    db.ok(&["add", "Login", "--start", "09:00", "--end", "10:00", "--tags", "a,only-first"]);
+    db.ok(&["add", "Login", "--start", "11:00", "--end", "12:00", "--tags", "a"]);
+    let entries = db.list_json();
+    let ids: Vec<String> = entries.as_array().unwrap().iter().map(|e| e["id"].as_str().unwrap()[..8].to_string()).collect();
+
+    db.ok(&["edit", &ids[0], &ids[1], "--description", "Login flow", "--project", "ACM", "--add-tags", "b", "--remove-tags", "A"]);
+
+    let entries = db.list_json();
+    for e in entries.as_array().unwrap() {
+        assert_eq!(e["description"], "Login flow");
+        assert!(e["projectId"].is_string());
+        assert!(!tag_names(e).contains(&"a".to_string()));
+        assert!(tag_names(e).contains(&"b".to_string()));
+    }
+    assert!(tag_names(&entries[0]).contains(&"only-first".to_string()), "tags only some entries had are kept");
+}
+
+#[test]
+fn edit_with_several_ids_refuses_times_and_is_all_or_nothing() {
+    let db = TestDb::new();
+    db.ok(&["add", "One", "--start", "09:00", "--end", "10:00"]);
+    db.ok(&["add", "Two", "--start", "11:00", "--end", "12:00"]);
+    let entries = db.list_json();
+    let a = entries[0]["id"].as_str().unwrap().to_string();
+    let b = entries[1]["id"].as_str().unwrap().to_string();
+
+    assert!(!db.run(&["edit", &a, &b, "--start", "08:00"]).status.success());
+    assert!(!db.run(&["edit", &a, "no-such-id", "--description", "Changed"]).status.success());
+    assert_eq!(db.list_json()[0]["description"], "One", "nothing is changed when one id is unknown");
+    assert!(!db.run(&["edit", &a, "--tags", "x", "--add-tags", "y"]).status.success());
+}

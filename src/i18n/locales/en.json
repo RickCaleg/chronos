@@ -48,7 +48,13 @@
     "noteHint": "Sent to ProofHub as the description; in a grouped push, entries with the same note are summed. Ctrl+Enter or clicking away saves, Esc cancels.",
     "editNote": "Edit note",
     "groupNotesDiffer": "The entries in this group have different notes — click to set one for all",
-    "groupNoteReplaces": "Replaces the notes of all {{count}} entries in this group (leave it untouched to keep them). Ctrl+Enter or clicking away saves, Esc cancels."
+    "groupNoteReplaces": "Replaces the notes of all {{count}} entries in this group (leave it untouched to keep them). Ctrl+Enter or clicking away saves, Esc cancels.",
+    "expandGroup": "Show the entries",
+    "collapseGroup": "Hide the entries",
+    "groupEditHint": "Changes apply to all {{count}} entries in this group. Times stay per entry — expand the group to change them.",
+    "groupTagsHint": "Tags only some entries have aren't shown; they're kept. What you add or remove here applies to all.",
+    "deleteGroup": "Delete all {{count}}",
+    "deleteGroupConfirm": "Delete all {{count}} entries in this group?"
   },
   "editor": {
     "taskDescription": "Task & description",

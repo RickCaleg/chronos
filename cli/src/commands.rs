@@ -29,8 +29,29 @@ pub fn run(conn: &Connection, command: Command) -> Result<()> {
         Command::Add { description, start, end, task, project, tags, note } => {
             cmd_add(conn, description, start, end, task, project, tags, note)
         }
-        Command::Edit { id, description, task, project, start, end, duration, tags, note } => {
-            cmd_edit(conn, id, description, task, project, start, end, duration, tags, note)
+        Command::Edit { ids, description, task, project, start, end, duration, tags, add_tags, remove_tags, note } => {
+            if ids.len() > 1 && (start.is_some() || end.is_some() || duration.is_some()) {
+                bail!("--start/--end/--duration change one entry at a time; pass a single id");
+            }
+            // All or nothing: an unknown id later in the list leaves every entry untouched.
+            let tx = conn.unchecked_transaction()?;
+            for id in ids {
+                let tag_changes = TagChanges { replace: tags.as_deref(), add: add_tags.as_deref(), remove: remove_tags.as_deref() };
+                cmd_edit(
+                    &tx,
+                    id,
+                    description.clone(),
+                    task.clone(),
+                    project.clone(),
+                    start.clone(),
+                    end.clone(),
+                    duration.clone(),
+                    tag_changes,
+                    note.clone(),
+                )?;
+            }
+            tx.commit()?;
+            Ok(())
         }
         Command::Delete { id, yes } => cmd_delete(conn, id, yes),
         Command::Projects { action } => cmd_projects(conn, action),
@@ -137,6 +158,34 @@ fn set_entry_tags(conn: &Connection, entry_id: &str, list: &str) -> Result<()> {
     for name in parse_tag_names(list) {
         let tag = find_or_create_tag(conn, &name)?;
         conn.execute("INSERT OR IGNORE INTO entry_tags (entry_id, tag_id) VALUES (?1, ?2)", params![entry_id, tag.id])?;
+    }
+    Ok(())
+}
+
+/// How `edit` changes an entry's tags: replace them all, or add/remove some.
+struct TagChanges<'a> {
+    replace: Option<&'a str>,
+    add: Option<&'a str>,
+    remove: Option<&'a str>,
+}
+
+fn apply_tag_changes(conn: &Connection, entry_id: &str, changes: &TagChanges) -> Result<()> {
+    if let Some(list) = changes.replace {
+        set_entry_tags(conn, entry_id, list)?;
+    }
+    if let Some(list) = changes.remove {
+        for name in parse_tag_names(list) {
+            conn.execute(
+                "DELETE FROM entry_tags WHERE entry_id = ?1 AND tag_id IN (SELECT id FROM tags WHERE name = ?2 COLLATE NOCASE)",
+                params![entry_id, name],
+            )?;
+        }
+    }
+    if let Some(list) = changes.add {
+        for name in parse_tag_names(list) {
+            let tag = find_or_create_tag(conn, &name)?;
+            conn.execute("INSERT OR IGNORE INTO entry_tags (entry_id, tag_id) VALUES (?1, ?2)", params![entry_id, tag.id])?;
+        }
     }
     Ok(())
 }
@@ -527,7 +576,7 @@ fn cmd_edit(
     start: Option<String>,
     end: Option<String>,
     duration: Option<String>,
-    tags: Option<String>,
+    tags: TagChanges,
     note: Option<String>,
 ) -> Result<()> {
     if duration.is_some() && end.is_some() {
@@ -599,9 +648,7 @@ fn cmd_edit(
             entry_id,
         ],
     )?;
-    if let Some(tags) = &tags {
-        set_entry_tags(conn, &entry_id, tags)?;
-    }
+    apply_tag_changes(conn, &entry_id, &tags)?;
     if let Some(note) = &note {
         set_note(conn, &entry_id, note)?;
     }

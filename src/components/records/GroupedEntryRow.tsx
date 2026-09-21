@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, ChevronRight, Copy } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
@@ -7,6 +7,7 @@ import { useProjectsStore } from "../../store/useProjectsStore";
 import { EntryRow } from "./EntryRow";
 import { RestartButton } from "./RestartButton";
 import { EntryNote, NoteButton } from "./EntryNote";
+import { GroupEditPopover } from "./GroupEditPopover";
 import { formatDurationHuman } from "../../lib/time";
 import { projectLabel } from "../../lib/projectLabel";
 import { cn } from "../../lib/cn";
@@ -21,6 +22,8 @@ export function GroupedEntryRow({ entries }: { entries: TimeEntry[] }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [editingNote, setEditingNote] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const editTriggerRef = useRef<HTMLButtonElement>(null);
 
   const first = entries[0];
   const project = projects.find((p) => p.id === first.projectId) ?? null;
@@ -43,12 +46,21 @@ export function GroupedEntryRow({ entries }: { entries: TimeEntry[] }) {
           <button
             type="button"
             onClick={() => setExpanded((o) => !o)}
+            aria-expanded={expanded}
+            aria-label={t(expanded ? "records.collapseGroup" : "records.expandGroup")}
+            title={t(expanded ? "records.collapseGroup" : "records.expandGroup")}
+            className="shrink-0 rounded-[2px] p-1 text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-border)] hover:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)]"
+          >
+            <ChevronRight size={14} className={cn("transition-transform", expanded && "rotate-90")} />
+          </button>
+
+          {/* Like a single entry's row, clicking the group opens its editor — which edits every entry in it. */}
+          <button
+            ref={editTriggerRef}
+            type="button"
+            onClick={() => setEditOpen(true)}
             className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 rounded-[2px] py-2 pl-1 pr-3 text-left outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)]"
           >
-            <ChevronRight
-              size={14}
-              className={cn("shrink-0 text-[var(--color-text-muted)] transition-transform", expanded && "rotate-90")}
-            />
 
             <span className="flex min-w-0 basis-full items-center gap-2 sm:basis-auto sm:flex-1">
               {first.taskNumber && (
@@ -104,7 +116,20 @@ export function GroupedEntryRow({ entries }: { entries: TimeEntry[] }) {
           </button>
         </div>
 
-        <EntryNote entries={entries} editing={editingNote} onEditingChange={setEditingNote} />
+        {/* Play, chevron and paddings: 66px to the description text. */}
+        <EntryNote entries={entries} editing={editingNote} onEditingChange={setEditingNote} indentClass="pl-[66px]" />
+
+        {/* Mounted only while open, so it always starts from the entries' current values. */}
+        {editOpen && (
+          <GroupEditPopover
+            open
+            entries={entries}
+            onClose={() => {
+              setEditOpen(false);
+              editTriggerRef.current?.focus();
+            }}
+          />
+        )}
       </div>
 
       {expanded && (

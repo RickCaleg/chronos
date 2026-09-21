@@ -4,6 +4,10 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Added
+- A group of rows can be edited as a whole: clicking it opens an editor for the task/description, project and tags of every entry in it, and can also delete them all. Tags you add or remove there apply to all entries, and tags only some entries have are kept. Times stay per entry. `chronos-cli edit` takes several ids for the same kind of change, plus `--add-tags`/`--remove-tags`.
+### Changed
+- Clicking a group row now opens its editor. Expanding and collapsing it is done with the chevron.
 
 ## [0.5.9] - 2026-09-21
 ### Added

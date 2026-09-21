@@ -48,7 +48,13 @@
     "noteHint": "Enviada ao ProofHub como descrição; no envio agrupado, lançamentos com a mesma nota são somados. Ctrl+Enter ou clicar fora salva, Esc cancela.",
     "editNote": "Editar nota",
     "groupNotesDiffer": "Os lançamentos deste grupo têm notas diferentes — clique para definir uma para todos",
-    "groupNoteReplaces": "Substitui as notas dos {{count}} lançamentos do grupo (deixe sem mexer para mantê-las). Ctrl+Enter ou clicar fora salva, Esc cancela."
+    "groupNoteReplaces": "Substitui as notas dos {{count}} lançamentos do grupo (deixe sem mexer para mantê-las). Ctrl+Enter ou clicar fora salva, Esc cancela.",
+    "expandGroup": "Mostrar os lançamentos",
+    "collapseGroup": "Ocultar os lançamentos",
+    "groupEditHint": "As alterações valem para os {{count}} lançamentos do grupo. Os horários são de cada lançamento — abra o grupo para mudá-los.",
+    "groupTagsHint": "Tags que só alguns lançamentos têm não aparecem aqui e são mantidas. O que você adicionar ou remover vale para todos.",
+    "deleteGroup": "Excluir os {{count}}",
+    "deleteGroupConfirm": "Excluir os {{count}} lançamentos deste grupo?"
   },
   "editor": {
     "taskDescription": "Task e descrição",

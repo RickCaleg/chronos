@@ -108,8 +108,14 @@ chronos-cli edit a1b2c3d4 --start "09:05"          # keeps end fixed, recomputes
 chronos-cli edit a1b2c3d4 --duration "0:20:00"     # keeps start fixed, recomputes end
 chronos-cli edit a1b2c3d4 --tags "meeting"          # replaces the tags; "" clears them
 chronos-cli edit a1b2c3d4 --note "Went over the PR" # "" clears it
+chronos-cli edit a1b2c3d4 --add-tags urgent --remove-tags draft   # keeps the other tags
+chronos-cli edit a1b2 c3d4 e5f6 --project WEB --add-tags billable  # several at once, like editing a group
 chronos-cli delete a1b2c3d4 --yes
 ```
+
+Several ids apply the same change to all of them, in one go (if any id is
+unknown, nothing changes) — everything except `--start`/`--end`/`--duration`,
+which are per entry. `--tags` can't be combined with `--add-tags`/`--remove-tags`.
 
 `--end` and `--duration` together are rejected — pick one, since they'd
 otherwise disagree about where the entry ends. On the running entry only

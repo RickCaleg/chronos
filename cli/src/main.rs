@@ -128,9 +128,13 @@ pub enum Command {
     /// is rejected as ambiguous. On a running entry, --start moves its start
     /// (like adjusting the start in the desktop app); --end/--duration need
     /// it stopped.
+    ///
+    /// Several ids edit them all at once (like editing a group in the app),
+    /// for everything but --start/--end/--duration.
     Edit {
-        /// Entry id (see `chronos-cli list --json`)
-        id: String,
+        /// Entry id or unique prefix (see `chronos-cli list`); several allowed
+        #[arg(required = true, num_args = 1..)]
+        ids: Vec<String>,
         #[arg(long)]
         description: Option<String>,
         /// Pass an empty string to clear it
@@ -146,8 +150,14 @@ pub enum Command {
         #[arg(long)]
         duration: Option<String>,
         /// Replaces the entry's tags (comma-separated); an empty string clears them
-        #[arg(long)]
+        #[arg(long, conflicts_with_all = ["add_tags", "remove_tags"])]
         tags: Option<String>,
+        /// Adds these tags (comma-separated), keeping the others
+        #[arg(long)]
+        add_tags: Option<String>,
+        /// Removes these tags (comma-separated), keeping the others
+        #[arg(long)]
+        remove_tags: Option<String>,
         /// Pass an empty string to clear it
         #[arg(long)]
         note: Option<String>,

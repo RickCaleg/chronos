@@ -49,10 +49,13 @@ export function EntryNote({
   entries,
   editing,
   onEditingChange,
+  indentClass = "pl-10",
 }: {
   entries: TimeEntry[];
   editing: boolean;
   onEditingChange: (editing: boolean) => void;
+  /** Left padding lining the note up with the row's description text. */
+  indentClass?: string;
 }) {
   const { t } = useTranslation();
   const update = useEntriesStore((s) => s.update);
@@ -71,6 +74,7 @@ export function EntryNote({
         hint={mixed ? t("records.groupNoteReplaces", { count: entries.length }) : undefined}
         onSave={save}
         onDone={() => onEditingChange(false)}
+        indentClass={indentClass}
       />
     );
   }
@@ -82,7 +86,8 @@ export function EntryNote({
       onClick={() => onEditingChange(true)}
       title={t("records.editNote")}
       className={cn(
-        "block w-full whitespace-pre-wrap break-words pb-2 pl-10 pr-3 text-left text-xs text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)]",
+        indentClass,
+        "block w-full whitespace-pre-wrap break-words pb-2 pr-3 text-left text-xs text-[var(--color-text-muted)] outline-none hover:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)]",
         mixed && "italic",
       )}
     >
@@ -97,11 +102,13 @@ function NoteEditor({
   hint,
   onSave,
   onDone,
+  indentClass,
 }: {
   initial: string;
   hint?: string;
   onSave: (note: string | null) => void;
   onDone: () => void;
+  indentClass: string;
 }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState(initial);
@@ -130,7 +137,7 @@ function NoteEditor({
   }
 
   return (
-    <div className="pb-2 pl-10 pr-3">
+    <div className={cn("pb-2 pr-3", indentClass)}>
       <textarea
         autoFocus
         value={draft}
