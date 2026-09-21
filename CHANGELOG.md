@@ -5,6 +5,18 @@ All notable changes to Chronos are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.5.11] - 2026-09-21
+### Added
+- A summary strip above the list shows today's and this week's totals (the running timer included), with a "Commands (Ctrl K)" button and the manual entry button.
+- The ProofHub tab lists every day of the last 30 with something unsent, with Send per day and "Send all". The ProofHub tab in the top menu shows how many are pending, from any screen. Alt+4 opens that tab.
+- Manual entries: the "Manual entry" button in the summary strip (also "Add an entry by hand" in the command palette) adds a finished entry with its own start, end, task, project and tags. It's kept apart from the timer bar and doesn't affect a running timer or what's typed there. The start is pre-filled with the end of today's last entry, so a gap is filled in one step, and the end with the current time. `chronos-cli add` already did this.
+### Changed
+- The row actions (copy, delete, and the note button when there's no note) only appear on hover or keyboard focus, so the list no longer shows a column of identical icons. The ProofHub status icon is still always visible.
+- Each day header has an always-visible ProofHub pill: "Send N" while something is unsent (red when something was deleted or changed in ProofHub), and a quiet "Sent" otherwise. Before, the send button only appeared on hover.
+- The ProofHub tab is organized into sections (Sending, Project mappings, Options, debug log), with the connection status in the header. Disconnecting now asks first.
+- Settings are grouped into Appearance, System, Integrations, and Data and backup. Language, theme and list grouping share one card.
+- The timer's clock is dimmed while nothing is running.
+
 ## [0.5.10] - 2026-09-21
 ### Added
 - A group of rows can be edited as a whole: clicking it opens an editor for the task/description, project and tags of every entry in it, and can also delete them all. Tags you add or remove there apply to all entries, and tags only some entries have are kept. Times stay per entry. `chronos-cli edit` takes several ids for the same kind of change, plus `--add-tags`/`--remove-tags`.
