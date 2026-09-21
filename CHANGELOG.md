@@ -4,6 +4,8 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.5.7] - 2026-09-21
 ### Added
 - Chronos can now check ProofHub for entries deleted or changed there by hand, which it had no way of knowing about. Use the new check button in a day's header, "Check" in an entry's edit popup, or "Check sent entries" in the ProofHub tab (last 30 days). An entry deleted in ProofHub then shows a red send icon, and one with other hours or another date shows a red update icon. The day's send button also picks them up. Checks only run when you ask.
 - An entry's edit popup has a ProofHub section showing its status in words, with Send/Send again, Check, and "Forget it was sent" (Chronos treats it as never sent, without touching ProofHub).
