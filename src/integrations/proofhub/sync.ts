@@ -6,6 +6,7 @@ import { useEntriesStore } from "../../store/useEntriesStore";
 import { formatLocalDate, nowIso } from "../../lib/time";
 import {
   applyRemoteCheck,
+  decodeRemoteRef,
   encodeRemoteRef,
   planSync,
   refKey,
@@ -96,7 +97,7 @@ async function sendUnit(unit: SyncUnit): Promise<void> {
     loggedMins: totalMinutes % 60,
     date: formatLocalDate(first.startTime),
     status: mapping.defaultBillable ? "billable" : "none",
-    description: unitDescription(unit),
+    description: unitDescription(unit, task !== null),
     ...(task ? { listId: task.listId, taskId: task.id } : {}),
   });
 
@@ -175,4 +176,81 @@ export async function forgetUnit(unit: SyncUnit): Promise<void> {
     await update(entry.id, { proofhubTimeEntryId: null, proofhubSyncedAt: null });
   }
   useProofHubStore.getState().setSendState(unit.entries.map((e) => e.id), false, null);
+}
+
+/** A time entry of yours in ProofHub that no Chronos entry was sent as. */
+export interface RemoteOnlyEntry extends RemoteRef {
+  date: string;
+  minutes: number;
+  description: string;
+  taskId: string | null;
+  /** The Chronos project mapped to its timesheet, if any still is. */
+  chronosProjectId: string | null;
+}
+
+interface ListedEntry extends RemoteRef {
+  date: string;
+  loggedHours: number | null;
+  loggedMins: number | null;
+  description: string;
+  taskId: string | null;
+}
+
+/**
+ * The other direction of a check: lists your entries dated `since` or later
+ * in every mapped timesheet (and any timesheet sent entries still point
+ * at), and returns the ones no Chronos entry references — logged by hand
+ * in ProofHub, or left over from a send Chronos has since forgotten.
+ */
+export async function findRemoteOnly(since: string): Promise<RemoteOnlyEntry[]> {
+  const { call, projectMap } = useProofHubStore.getState();
+  const { entries } = useEntriesStore.getState();
+
+  const known = new Set<string>();
+  const timesheets = new Map<string, { projectId: string; timesheetId: string }>();
+  for (const mapping of Object.values(projectMap)) {
+    const target = { projectId: mapping.proofhubProjectId, timesheetId: mapping.timesheetId };
+    timesheets.set(`${target.projectId}/${target.timesheetId}`, target);
+  }
+  for (const entry of entries) {
+    const mapping = entry.projectId ? projectMap[entry.projectId] : undefined;
+    const fallback = mapping ? { projectId: mapping.proofhubProjectId, timesheetId: mapping.timesheetId } : null;
+    const ref = decodeRemoteRef(entry.proofhubTimeEntryId, fallback);
+    if (!ref) continue;
+    known.add(refKey(ref));
+    timesheets.set(`${ref.projectId}/${ref.timesheetId}`, { projectId: ref.projectId, timesheetId: ref.timesheetId });
+  }
+
+  const chronosProjectFor = (ref: { projectId: string; timesheetId: string }) =>
+    Object.entries(projectMap).find(
+      ([, m]) => m.proofhubProjectId === ref.projectId && m.timesheetId === ref.timesheetId,
+    )?.[0] ?? null;
+
+  const found: RemoteOnlyEntry[] = [];
+  for (const target of timesheets.values()) {
+    const listed = await call<ListedEntry[]>("list-entries", { ...target, since });
+    for (const item of listed) {
+      if (known.has(refKey(item))) continue;
+      found.push({
+        projectId: item.projectId,
+        timesheetId: item.timesheetId,
+        timeId: item.timeId,
+        date: item.date,
+        minutes: (item.loggedHours ?? 0) * 60 + (item.loggedMins ?? 0),
+        description: item.description,
+        taskId: item.taskId,
+        chronosProjectId: chronosProjectFor(item),
+      });
+    }
+  }
+  return found.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+}
+
+/** Deletes a ProofHub time entry (one no Chronos entry references). */
+export async function deleteRemoteEntry(ref: RemoteRef): Promise<void> {
+  await useProofHubStore.getState().call("delete-entry", {
+    projectId: ref.projectId,
+    timesheetId: ref.timesheetId,
+    timeId: ref.timeId,
+  });
 }

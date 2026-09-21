@@ -456,13 +456,14 @@ entry on the same day sharing task number, description and project (the
 same criterion as `lib/grouping.ts`, applied independently of the display
 grouping option). A unit's ProofHub entry gets the unit's **total**.
 
-An entry with a **note** (`time_entries.note`, migration 5 — free text
-shown and edited inline under the row) is always a unit of its own, and
-its note becomes the ProofHub description (`unitDescription`); entries
-without one are described by their name (`#task - description`) and still
-sum together. When an entry of an already-sent group gains a note, the
-note-less rest keeps the group's ProofHub entry and the noted one is sent
-as a new one. The CLI never adds the `note` column itself (an `ADD COLUMN`
+Entries also only share a unit when they share their **note**
+(`time_entries.note`, migration 5 — free text shown and edited inline under
+a row, or under a group row, where it sets the note of every entry in the
+group). The ProofHub description (`unitDescription`) is the note; without
+one it's empty when the time is logged on a task (ProofHub shows the task
+already) and the entry's name (`#task - description`) otherwise. When some
+entries of an already-sent group gain a note, the note-less part keeps the
+group's ProofHub entry and the rest are sent as new ones. The CLI never adds the `note` column itself (an `ADD COLUMN`
 ahead of the app's migration would make that migration fail) and copes
 with it missing.
 
@@ -540,6 +541,14 @@ single-entry lookup `time_entry_exists` already relies on. Each result
 ProofHub store, **in memory only**: a check is a snapshot, and a fresh
 session starts from "not checked" rather than trusting stale data. A send
 records what it just wrote there, so a resent unit reads `synced` again.
+
+"Check sent entries" also looks the other way (`findRemoteOnly`, plugin
+action `list-entries`): it lists **your** entries (`by_me`, per the API
+docs) dated in the window from every mapped timesheet and every timesheet a
+sent entry points at, and shows the ones no Chronos entry references —
+logged by hand in ProofHub, or left behind by a send Chronos has since
+forgotten — each deletable there. The listing endpoint documents no paging;
+if it turns out to page, only the first page is seen.
 
 Checks only run when asked: the day header's check button, "Check" in the
 edit popover, and "Check sent entries" in the ProofHub tab (units sent in

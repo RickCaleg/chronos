@@ -10,8 +10,9 @@ import { dayKey } from "../../lib/time";
  *
  * A *unit* is whatever becomes exactly one ProofHub time entry: a single
  * Chronos entry, or (with "group pushes by day" on) every entry on the same
- * day sharing task number, description and project — except entries with
- * a note, which always go on their own, carrying it as their description. Every unit either
+ * day sharing task number, description and project — and note: entries
+ * with a note only sum with others carrying the same note (e.g. one set on
+ * the whole group), and send it as their description. Every unit either
  * reuses one existing ProofHub entry that Chronos created earlier (updated
  * in place) or creates a new one; ProofHub entries that no unit reuses any
  * more (grouping toggled, mapping changed, entries regrouped) are
@@ -50,29 +51,38 @@ export function decodeRemoteRef(
  * `missing`/`changed` are `synced` units that a check against ProofHub
  * (`applyRemoteCheck`) found deleted there, or with different hours/date.
  */
-function hasNote(entry: TimeEntry): boolean {
-  return !!entry.note?.trim();
+function noteOf(entry: TimeEntry): string {
+  return entry.note?.trim() ?? "";
 }
 
 /**
- * The text a unit's ProofHub entry gets: its note when it has one (only a
- * lone entry can, see `planSync`), otherwise the entry's name.
+ * The text a unit's ProofHub entry gets (every entry in a unit shares its
+ * note, see `splitByNote`): the note when there is one; otherwise nothing
+ * when the time is logged on a task — ProofHub already shows the task —
+ * and the entry's name when it isn't.
  */
-export function unitDescription(unit: Pick<SyncUnit, "entries">): string {
+export function unitDescription(unit: Pick<SyncUnit, "entries">, onTask: boolean): string {
   const first = unit.entries[0];
-  if (hasNote(first)) return first.note!.trim();
+  const note = noteOf(first);
+  if (note) return note;
+  if (onTask) return "";
   return first.taskNumber ? `${first.taskNumber} - ${first.description}` : first.description;
 }
 
 /**
- * Splits a same-task group so each entry with a note is its own unit. The
- * note-less rest stays summed and comes first, so it's the one that keeps
- * the group's existing ProofHub entry when an entry gains a note.
+ * Splits a same-task group by note: entries sharing a note (or having
+ * none) stay summed together. The note-less part comes first, so it's the
+ * one that keeps the group's existing ProofHub entry when some entries
+ * gain a note.
  */
-function splitNoted(group: TimeEntry[]): TimeEntry[][] {
-  const rest = group.filter((entry) => !hasNote(entry));
-  const noted = group.filter(hasNote).map((entry) => [entry]);
-  return rest.length > 0 ? [rest, ...noted] : noted;
+function splitByNote(group: TimeEntry[]): TimeEntry[][] {
+  const byNote = new Map<string, TimeEntry[]>([["", []]]);
+  for (const entry of group) {
+    const note = noteOf(entry);
+    if (!byNote.has(note)) byNote.set(note, []);
+    byNote.get(note)!.push(entry);
+  }
+  return Array.from(byNote.values()).filter((part) => part.length > 0);
 }
 
 export type UnitStatus = "new" | "pending" | "synced" | "missing" | "changed";
@@ -140,7 +150,7 @@ export function planSync(entries: TimeEntry[], projectMap: ProofHubProjectMap, g
   const drafts: Omit<SyncUnit, "reuse" | "orphans" | "releaseEntryIds" | "status">[] = [];
   for (const [day, dayEntries] of byDay) {
     const groups = grouped
-      ? groupSimilarEntries(dayEntries).flatMap((item) => splitNoted(Array.isArray(item) ? item : [item]))
+      ? groupSimilarEntries(dayEntries).flatMap((item) => splitByNote(Array.isArray(item) ? item : [item]))
       : dayEntries.map((entry) => [entry]);
     for (const group of groups) {
       const mapping = projectMap[group[0].projectId!];

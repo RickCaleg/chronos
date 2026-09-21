@@ -76,6 +76,17 @@ enum Request {
         api_key: String,
         entries: Vec<EntryRef>,
     },
+    /// The current user's time entries in a timesheet dated `since` or
+    /// later — how Chronos finds entries that exist in ProofHub but not in
+    /// Chronos. Teammates' entries (`by_me: false`) are left out.
+    #[serde(rename_all = "camelCase")]
+    ListEntries {
+        subdomain: String,
+        api_key: String,
+        project_id: String,
+        timesheet_id: String,
+        since: String,
+    },
     /// Removes a time entry Chronos created earlier that no longer
     /// represents anything (see `planDay` in src/integrations/proofhub/plan.ts).
     /// Already-gone entries count as success.
@@ -342,6 +353,36 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
                 }));
             }
             Ok(Value::Array(results))
+        }
+        Request::ListEntries {
+            subdomain,
+            api_key,
+            project_id,
+            timesheet_id,
+            since,
+        } => {
+            let body = get(client, &subdomain, &api_key, &format!("/projects/{project_id}/timesheets/{timesheet_id}/time"))?;
+            let entries = extract_list(&body, &["time_entries"])
+                .into_iter()
+                // Documented on every entry; treated as mine if ever absent.
+                .filter(|item| item.get("by_me").and_then(Value::as_bool) != Some(false))
+                .filter_map(|item| {
+                    let date: String = item.get("date").and_then(Value::as_str)?.chars().take(10).collect();
+                    (date >= since).then(|| {
+                        json!({
+                            "projectId": project_id,
+                            "timesheetId": timesheet_id,
+                            "timeId": stringify_id(item.get("id")),
+                            "date": date,
+                            "loggedHours": as_number(item.get("logged_hours")),
+                            "loggedMins": as_number(item.get("logged_mins")),
+                            "description": item.get("description").and_then(Value::as_str).unwrap_or(""),
+                            "taskId": item.get("task").and_then(|t| t.get("id")).map(|id| stringify_id(Some(id))),
+                        })
+                    })
+                })
+                .collect();
+            Ok(Value::Array(entries))
         }
         Request::DeleteEntry {
             subdomain,

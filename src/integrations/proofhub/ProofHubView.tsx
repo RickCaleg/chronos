@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { Check, ChevronRight, Loader2, RefreshCw } from "lucide-react";
+import { Check, ChevronRight, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { useProofHubStore, type RemoteItem } from "./useProofHubStore";
 import { linksTasks } from "../../db/proofhubSettings";
 import { useProjectsStore } from "../../store/useProjectsStore";
@@ -11,8 +11,10 @@ import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
 import { Switch } from "../../components/ui/Switch";
 import { cn } from "../../lib/cn";
-import { dayKey } from "../../lib/time";
-import { checkUnits, useSyncPlan } from "./sync";
+import { dayKey, formatDurationHuman } from "../../lib/time";
+import { checkUnits, deleteRemoteEntry, findRemoteOnly, useSyncPlan, type RemoteOnlyEntry } from "./sync";
+import { refKey } from "./plan";
+import { confirm } from "../../components/ui/ConfirmDialog";
 import { applyRemoteCheck } from "./plan";
 
 /** How far back "check sent entries" looks — deletions in ProofHub rarely happen later than that. */
@@ -45,6 +47,7 @@ export function ProofHubView() {
   const [checking, setChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<string | null>(null);
   const [checkError, setCheckError] = useState<string | null>(null);
+  const [remoteOnly, setRemoteOnly] = useState<RemoteOnlyEntry[] | null>(null);
 
   useEffect(() => {
     if (proofhub.subdomain && !proofhub.remoteProjects) {
@@ -67,6 +70,7 @@ export function ProofHubView() {
     setChecking(true);
     setCheckResult(null);
     setCheckError(null);
+    setRemoteOnly(null);
     try {
       const since = dayKey(new Date(Date.now() - CHECK_DAYS * 86_400_000).toISOString());
       const units = plan.units.filter((unit) => unit.reuse && unit.day >= since);
@@ -79,6 +83,8 @@ export function ProofHubView() {
           ? t("proofhub.checkSentFound", { missing, changed })
           : t("proofhub.checkSentNothing", { count: units.length }),
       );
+      // The other direction; its failure shouldn't hide the result above.
+      setRemoteOnly(await findRemoteOnly(since));
     } catch (err) {
       setCheckError(t("proofhub.checkFailure", { message: String(err) }));
     } finally {
@@ -190,6 +196,12 @@ export function ProofHubView() {
             </div>
             {checkResult && <p className="mt-2 text-xs text-[var(--color-text-muted)]">{checkResult}</p>}
             {checkError && <p className="mt-2 text-xs text-[var(--color-danger)]">{checkError}</p>}
+            {remoteOnly && (
+              <RemoteOnlyList
+                entries={remoteOnly}
+                onDeleted={(ref) => setRemoteOnly((list) => list?.filter((e) => refKey(e) !== refKey(ref)) ?? null)}
+              />
+            )}
           </div>
 
           <div className="flex items-center justify-between">
@@ -364,6 +376,91 @@ function ProjectMappingRow({
         </div>
       )}
 
+      {error && <p className="mt-1 text-xs text-[var(--color-danger)]">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * Your ProofHub entries (from the last check) that no Chronos entry was
+ * sent as — logged by hand there, or left over from an old send. Each can
+ * be deleted in ProofHub, e.g. a duplicate counting hours twice.
+ */
+function RemoteOnlyList({
+  entries,
+  onDeleted,
+}: {
+  entries: RemoteOnlyEntry[];
+  onDeleted: (entry: RemoteOnlyEntry) => void;
+}) {
+  const { t } = useTranslation();
+  const { projects } = useProjectsStore();
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (entries.length === 0) {
+    return <p className="mt-1 text-xs text-[var(--color-text-muted)]">{t("proofhub.remoteOnlyNone")}</p>;
+  }
+
+  async function handleDelete(entry: RemoteOnlyEntry) {
+    const hours = formatDurationHuman(entry.minutes * 60);
+    const ok = await confirm(t("proofhub.remoteOnlyDeleteConfirm", { date: entry.date, hours }), {
+      danger: true,
+      confirmLabel: t("proofhub.remoteOnlyDelete"),
+    });
+    if (!ok) return;
+    setDeleting(entry.timeId);
+    setError(null);
+    try {
+      await deleteRemoteEntry(entry);
+      onDeleted(entry);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  return (
+    <div className="mt-3">
+      <p className="mb-1 text-xs font-medium">{t("proofhub.remoteOnlyTitle", { count: entries.length })}</p>
+      <p className="mb-2 text-xs text-[var(--color-text-muted)]">{t("proofhub.remoteOnlyHint")}</p>
+      <ul className="divide-y divide-[var(--color-border)] rounded-[2px] border border-[var(--color-border)]">
+        {entries.map((entry) => {
+          const project = projects.find((p) => p.id === entry.chronosProjectId);
+          return (
+            <li key={refKey(entry)} className="flex items-center gap-3 px-2 py-1.5 text-xs">
+              <span className="w-20 shrink-0 tabular-nums text-[var(--color-text-muted)]">{entry.date}</span>
+              <span className="w-14 shrink-0 text-right font-mono tabular-nums">
+                {formatDurationHuman(entry.minutes * 60)}
+              </span>
+              <span className="min-w-0 flex-1 truncate">
+                {entry.description || (
+                  <span className="italic text-[var(--color-text-muted)]">
+                    {entry.taskId ? t("proofhub.remoteOnlyOnTask") : t("records.noDescription")}
+                  </span>
+                )}
+              </span>
+              {project && (
+                <span className="flex shrink-0 items-center gap-1.5 text-[var(--color-text-muted)]">
+                  <span className="h-2 w-2 rounded-[1px]" style={{ backgroundColor: project.color }} />
+                  <span className="max-w-[8rem] truncate">{project.name}</span>
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => handleDelete(entry)}
+                disabled={deleting !== null}
+                aria-label={t("proofhub.remoteOnlyDelete")}
+                title={t("proofhub.remoteOnlyDelete")}
+                className="shrink-0 rounded-[2px] p-1 text-[var(--color-text-muted)] outline-none hover:bg-[var(--color-border)] hover:text-[var(--color-danger)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)] disabled:opacity-50"
+              >
+                {deleting === entry.timeId ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
       {error && <p className="mt-1 text-xs text-[var(--color-danger)]">{error}</p>}
     </div>
   );
