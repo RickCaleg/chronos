@@ -4,6 +4,8 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.5.12] - 2026-09-21
 ### Added
 - Chronos checks ProofHub on its own for sent entries that were deleted or changed there: when the app opens, and every 30 minutes while it's open, for the last 30 days. Such entries turn red without anyone clicking "Check". Only when the ProofHub plugin is connected. It's a few requests per run.
 ### Fixed
