@@ -38,7 +38,14 @@
     "copy": "Copy",
     "copyDay": "Copy day summary",
     "restart": "Restart timer",
-    "addManual": "Add manual entry"
+    "addManual": "Add manual entry",
+    "note": "Note",
+    "addNote": "Add a note",
+    "notePlaceholder": "What was done…",
+    "noteHint": "Sent to ProofHub instead of the entry's name; in a grouped push, an entry with a note goes on its own. Ctrl+Enter or clicking away saves, Esc cancels.",
+    "groupNotes": "{{count}} with a note — open the group to edit",
+    "groupAddNote": "Notes are per entry — open the group to add one",
+    "editNote": "Edit note"
   },
   "editor": {
     "taskDescription": "Task & description",

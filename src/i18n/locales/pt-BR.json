@@ -38,7 +38,14 @@
     "copy": "Copiar",
     "copyDay": "Copiar resumo do dia",
     "restart": "Reiniciar timer",
-    "addManual": "Adicionar registro manual"
+    "addManual": "Adicionar registro manual",
+    "note": "Nota",
+    "addNote": "Adicionar nota",
+    "notePlaceholder": "O que foi feito…",
+    "noteHint": "Enviada ao ProofHub no lugar do nome; no envio agrupado, um lançamento com nota vai separado. Ctrl+Enter ou clicar fora salva, Esc cancela.",
+    "groupNotes": "{{count}} com nota — abra o grupo para editar",
+    "groupAddNote": "As notas são por lançamento — abra o grupo para adicionar",
+    "editNote": "Editar nota"
   },
   "editor": {
     "taskDescription": "Task e descrição",

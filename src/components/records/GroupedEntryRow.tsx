@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronRight, Copy, Play } from "lucide-react";
+import { Check, ChevronRight, Copy, NotebookPen, Play } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import type { TimeEntry } from "../../types";
 import { useProjectsStore } from "../../store/useProjectsStore";
@@ -24,6 +24,7 @@ export function GroupedEntryRow({ entries }: { entries: TimeEntry[] }) {
   const first = entries[0];
   const project = projects.find((p) => p.id === first.projectId) ?? null;
   const total = entries.reduce((sum, e) => sum + (e.durationSeconds ?? 0), 0);
+  const notedCount = entries.filter((e) => e.note?.trim()).length;
   const uniqueTags = Array.from(new Map(entries.flatMap((e) => e.tags).map((tag) => [tag.id, tag])).values());
 
   async function handleCopy() {
@@ -97,6 +98,18 @@ export function GroupedEntryRow({ entries }: { entries: TimeEntry[] }) {
 
             <span className="w-14 text-right font-mono text-sm tabular-nums">{formatDurationHuman(total)}</span>
           </span>
+        </button>
+
+        {/* Notes belong to single entries, so this just opens the group to pick one. */}
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          aria-label={notedCount ? t("records.groupNotes", { count: notedCount }) : t("records.groupAddNote")}
+          title={notedCount ? t("records.groupNotes", { count: notedCount }) : t("records.groupAddNote")}
+          className={cn(iconButtonClass, "flex items-center gap-1", notedCount > 0 && "text-[var(--color-accent)]")}
+        >
+          <NotebookPen size={14} />
+          {notedCount > 0 && <span className="text-[10px] tabular-nums">{notedCount}</span>}
         </button>
 
         {/* Acts on every ProofHub unit in the group: one with "group pushes by day" on, one per entry otherwise. */}

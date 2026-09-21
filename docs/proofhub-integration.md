@@ -456,6 +456,16 @@ entry on the same day sharing task number, description and project (the
 same criterion as `lib/grouping.ts`, applied independently of the display
 grouping option). A unit's ProofHub entry gets the unit's **total**.
 
+An entry with a **note** (`time_entries.note`, migration 5 — free text
+shown and edited inline under the row) is always a unit of its own, and
+its note becomes the ProofHub description (`unitDescription`); entries
+without one are described by their name (`#task - description`) and still
+sum together. When an entry of an already-sent group gains a note, the
+note-less rest keeps the group's ProofHub entry and the noted one is sent
+as a new one. The CLI never adds the `note` column itself (an `ADD COLUMN`
+ahead of the app's migration would make that migration fail) and copes
+with it missing.
+
 `src/integrations/proofhub/plan.ts` (`planSync`) is a pure function over
 all entries + mappings + that setting, recomputed only when one of them
 changes (`useSyncPlan` in `sync.ts`). For each unit it decides:
@@ -504,8 +514,9 @@ are refused rather than logged as 0h 0m.
 
 ### 8.3 Edits and deletes after a push
 
-Editing an entry's content clears `proofhub_synced_at` (the unit becomes
-`pending`). Deleting an entry that shared a ProofHub entry with others
+Editing an entry's content — its note included — clears
+`proofhub_synced_at` (the unit becomes `pending`), both in the database and
+in memory. Deleting an entry that shared a ProofHub entry with others
 marks those others `pending`, so resending corrects the total. Deleting an
 entry that was its ProofHub entry's only member leaves that ProofHub entry
 alone — Chronos never deletes hours in ProofHub the user didn't ask to

@@ -16,6 +16,7 @@ interface EntryRow {
   updated_at: string;
   proofhub_time_entry_id: string | null;
   proofhub_synced_at: string | null;
+  note: string | null;
 }
 
 function fromRow(row: EntryRow): TimeEntry {
@@ -33,6 +34,7 @@ function fromRow(row: EntryRow): TimeEntry {
     tags: [],
     proofhubTimeEntryId: row.proofhub_time_entry_id,
     proofhubSyncedAt: row.proofhub_synced_at,
+    note: row.note,
   };
 }
 
@@ -75,6 +77,7 @@ export async function startEntry(input: StartEntryInput): Promise<TimeEntry> {
     tags: [],
     proofhubTimeEntryId: null,
     proofhubSyncedAt: null,
+    note: null,
   };
   await db.execute(
     `INSERT INTO time_entries
@@ -102,6 +105,7 @@ export interface EntryPatch {
   durationSeconds?: number | null;
   proofhubTimeEntryId?: string | null;
   proofhubSyncedAt?: string | null;
+  note?: string | null;
 }
 
 export async function updateEntry(id: string, patch: EntryPatch): Promise<void> {
@@ -119,6 +123,7 @@ export async function updateEntry(id: string, patch: EntryPatch): Promise<void> 
     duration_seconds: patch.durationSeconds,
     proofhub_time_entry_id: patch.proofhubTimeEntryId,
     proofhub_synced_at: patch.proofhubSyncedAt,
+    note: patch.note,
   };
 
   for (const [column, value] of Object.entries(map)) {
@@ -140,6 +145,7 @@ export async function updateEntry(id: string, patch: EntryPatch): Promise<void> 
     patch.startTime,
     patch.endTime,
     patch.durationSeconds,
+    patch.note,
   ].some((v) => v !== undefined);
   if (contentChanged && patch.proofhubSyncedAt === undefined) {
     fields.push("proofhub_synced_at = NULL");
@@ -168,8 +174,8 @@ export async function replaceAllEntries(entries: TimeEntry[]): Promise<void> {
   for (const e of entries) {
     await db.execute(
       `INSERT INTO time_entries
-        (id, description, task_number, project_id, start_time, end_time, duration_seconds, is_running, created_at, updated_at, proofhub_time_entry_id, proofhub_synced_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        (id, description, task_number, project_id, start_time, end_time, duration_seconds, is_running, created_at, updated_at, proofhub_time_entry_id, proofhub_synced_at, note)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         e.id,
         e.description,
@@ -183,6 +189,7 @@ export async function replaceAllEntries(entries: TimeEntry[]): Promise<void> {
         e.updatedAt,
         e.proofhubTimeEntryId ?? null,
         e.proofhubSyncedAt ?? null,
+        e.note ?? null,
       ],
     );
   }

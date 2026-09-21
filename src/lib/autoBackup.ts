@@ -3,6 +3,7 @@ import { join } from "@tauri-apps/api/path";
 import type { Backup } from "../types";
 import * as projectsDb from "../db/projects";
 import * as entriesDb from "../db/entries";
+import * as tagsDb from "../db/tags";
 import { nowIso } from "./time";
 import { useAutoBackupStore } from "../store/useAutoBackupStore";
 
@@ -42,8 +43,12 @@ export async function performAutoBackup(): Promise<void> {
     await mkdir(folder, { recursive: true });
   }
 
-  const [projects, timeEntries] = await Promise.all([projectsDb.listProjects(), entriesDb.listEntries()]);
-  const backup: Backup = { version: 1, exportedAt: nowIso(), projects, timeEntries };
+  const [projects, timeEntries, tags] = await Promise.all([
+    projectsDb.listProjects(),
+    entriesDb.listEntries(),
+    tagsDb.listTags(),
+  ]);
+  const backup: Backup = { version: 1, exportedAt: nowIso(), projects, timeEntries, tags };
 
   const now = nowIso();
   const path = await join(folder, backupFileName(now));

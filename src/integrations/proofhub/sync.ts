@@ -9,6 +9,7 @@ import {
   encodeRemoteRef,
   planSync,
   refKey,
+  unitDescription,
   unitMinutes,
   type RemoteEntryState,
   type RemoteRef,
@@ -95,7 +96,7 @@ async function sendUnit(unit: SyncUnit): Promise<void> {
     loggedMins: totalMinutes % 60,
     date: formatLocalDate(first.startTime),
     status: mapping.defaultBillable ? "billable" : "none",
-    description: first.taskNumber ? `${first.taskNumber} - ${first.description}` : first.description,
+    description: unitDescription(unit),
     ...(task ? { listId: task.listId, taskId: task.id } : {}),
   });
 

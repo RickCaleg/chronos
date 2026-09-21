@@ -7,6 +7,7 @@ import type { TimeEntry } from "../../types";
 import { useProjectsStore } from "../../store/useProjectsStore";
 import { useEntriesStore } from "../../store/useEntriesStore";
 import { EntryEditPopover } from "./EntryEditPopover";
+import { EntryNote, NoteButton } from "./EntryNote";
 import { formatDurationHuman, formatTimeShort, nowIso } from "../../lib/time";
 import { projectLabel } from "../../lib/projectLabel";
 import { SyncBadge } from "../../integrations/proofhub/SyncBadge";
@@ -21,6 +22,7 @@ export function EntryRow({ entry }: { entry: TimeEntry }) {
   const { update, remove, start, stop, runningEntry } = useEntriesStore();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [editingNote, setEditingNote] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const project = projects.find((p) => p.id === entry.projectId) ?? null;
@@ -55,84 +57,90 @@ export function EntryRow({ entry }: { entry: TimeEntry }) {
   }
 
   return (
-    <div className="relative flex items-center gap-1 hover:bg-[var(--color-surface-hover)]">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 rounded-[2px] px-3 py-2 text-left outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)]"
-      >
-        <span className="flex min-w-0 basis-full items-center gap-2 sm:basis-auto sm:flex-1">
-          {entry.taskNumber && (
-            <span className="shrink-0 rounded-[2px] bg-[var(--color-bg)] px-2 py-0.5 text-xs text-[var(--color-text-muted)]">
-              {entry.taskNumber}
-            </span>
-          )}
-          <span className="min-w-0 truncate text-sm">
-            {entry.description || <span className="text-[var(--color-text-muted)]">{t("records.noDescription")}</span>}
-          </span>
-        </span>
-
-        <span className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
-          {entry.tags.length > 0 && (
-            <span className="flex flex-wrap items-center gap-1">
-              {entry.tags.map((tag) => (
-                <span
-                  key={tag.id}
-                  className="rounded-[2px] bg-[var(--color-bg)] px-1.5 py-0.5 text-[10px] text-[var(--color-text-muted)]"
-                >
-                  {tag.name}
-                </span>
-              ))}
-            </span>
-          )}
-
-          <span className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
-            {project ? (
-              <>
-                <span className="h-2 w-2 shrink-0 rounded-[1px]" style={{ backgroundColor: project.color }} />
-                <span className="max-w-[10rem] truncate">{projectLabel(project)}</span>
-              </>
-            ) : (
-              <span className="italic">{t("records.noProject")}</span>
+    <div className="relative hover:bg-[var(--color-surface-hover)]">
+      <div className="flex items-center gap-1">
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 rounded-[2px] px-3 py-2 text-left outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)]"
+        >
+          <span className="flex min-w-0 basis-full items-center gap-2 sm:basis-auto sm:flex-1">
+            {entry.taskNumber && (
+              <span className="shrink-0 rounded-[2px] bg-[var(--color-bg)] px-2 py-0.5 text-xs text-[var(--color-text-muted)]">
+                {entry.taskNumber}
+              </span>
             )}
+            <span className="min-w-0 truncate text-sm">
+              {entry.description || <span className="text-[var(--color-text-muted)]">{t("records.noDescription")}</span>}
+            </span>
           </span>
 
-          <span className="text-xs text-[var(--color-text-muted)]">
-            {formatTimeShort(entry.startTime, i18n.language)}
-            {entry.endTime ? ` – ${formatTimeShort(entry.endTime, i18n.language)}` : ""}
+          <span className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
+            {entry.tags.length > 0 && (
+              <span className="flex flex-wrap items-center gap-1">
+                {entry.tags.map((tag) => (
+                  <span
+                    key={tag.id}
+                    className="rounded-[2px] bg-[var(--color-bg)] px-1.5 py-0.5 text-[10px] text-[var(--color-text-muted)]"
+                  >
+                    {tag.name}
+                  </span>
+                ))}
+              </span>
+            )}
+
+            <span className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+              {project ? (
+                <>
+                  <span className="h-2 w-2 shrink-0 rounded-[1px]" style={{ backgroundColor: project.color }} />
+                  <span className="max-w-[10rem] truncate">{projectLabel(project)}</span>
+                </>
+              ) : (
+                <span className="italic">{t("records.noProject")}</span>
+              )}
+            </span>
+
+            <span className="text-xs text-[var(--color-text-muted)]">
+              {formatTimeShort(entry.startTime, i18n.language)}
+              {entry.endTime ? ` – ${formatTimeShort(entry.endTime, i18n.language)}` : ""}
+            </span>
+
+            <span className="w-14 text-right font-mono text-sm tabular-nums">
+              {formatDurationHuman(entry.durationSeconds ?? 0)}
+            </span>
           </span>
+        </button>
 
-          <span className="w-14 text-right font-mono text-sm tabular-nums">
-            {formatDurationHuman(entry.durationSeconds ?? 0)}
-          </span>
-        </span>
-      </button>
+        <NoteButton entry={entry} onClick={() => setEditingNote(true)} />
 
-      <SyncBadge entries={[entry]} />
+        <SyncBadge entries={[entry]} />
 
-      <button
-        type="button"
-        onClick={handleRestart}
-        aria-label={t("records.restart")}
-        title={t("records.restart")}
-        className={`${iconButtonClass} hover:text-[var(--color-accent)]`}
-      >
-        <Play size={14} />
-      </button>
+        <button
+          type="button"
+          onClick={handleRestart}
+          aria-label={t("records.restart")}
+          title={t("records.restart")}
+          className={`${iconButtonClass} hover:text-[var(--color-accent)]`}
+        >
+          <Play size={14} />
+        </button>
 
-      <button type="button" onClick={handleCopy} aria-label={t("records.copy")} className={iconButtonClass}>
-        {copied ? <Check size={14} className="text-[var(--color-accent)]" /> : <Copy size={14} />}
-      </button>
+        <button type="button" onClick={handleCopy} aria-label={t("records.copy")} className={iconButtonClass}>
+          {copied ? <Check size={14} className="text-[var(--color-accent)]" /> : <Copy size={14} />}
+        </button>
 
-      <button
-        type="button"
-        onClick={handleDelete}
-        aria-label={t("editor.delete")}
-        className={`${iconButtonClass} hover:text-[var(--color-danger)]`}
-      >
-        <Trash2 size={14} />
-      </button>
+        <button
+          type="button"
+          onClick={handleDelete}
+          aria-label={t("editor.delete")}
+          className={`${iconButtonClass} hover:text-[var(--color-danger)]`}
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+
+      <EntryNote entry={entry} editing={editingNote} onEditingChange={setEditingNote} />
 
       <EntryEditPopover
         open={open}

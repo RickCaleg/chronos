@@ -27,6 +27,8 @@ export interface TimeEntry {
   tags: Tag[];
   proofhubTimeEntryId: string | null;
   proofhubSyncedAt: string | null;
+  /** Free text about what was done; sent to ProofHub instead of the description when set. */
+  note: string | null;
 }
 
 export interface Backup {

@@ -50,12 +50,17 @@ export async function importJsonBackup(): Promise<boolean> {
 
   await projectsDb.replaceAllProjects(backup.projects);
   await entriesDb.replaceAllEntries(backup.timeEntries);
-  await tagsDb.replaceAllTags(backup.tags ?? []);
+  // Older automatic backups have no `tags` list, but each entry
+  // carries its full tags, so the list can be rebuilt from those.
+  const tags =
+    backup.tags ?? Array.from(new Map(backup.timeEntries.flatMap((e) => e.tags ?? []).map((tag) => [tag.id, tag])).values());
+  await tagsDb.replaceAllTags(tags);
   await tagsDb.replaceAllEntryTags(backup.timeEntries.map((e) => ({ id: e.id, tags: e.tags ?? [] })));
   return true;
 }
 
-const CSV_HEADER = ["Project", "Task", "Description", "Start Date", "Start Time", "End Date", "End Time", "Duration"];
+// "Note" goes last so the older columns keep their positions; the importers read by header name anyway.
+const CSV_HEADER = ["Project", "Task", "Description", "Start Date", "Start Time", "End Date", "End Time", "Duration", "Note"];
 
 export async function exportEntriesCsv(): Promise<boolean> {
   const [projects, entries] = await Promise.all([projectsDb.listProjects(), entriesDb.listEntries()]);
@@ -74,6 +79,7 @@ export async function exportEntriesCsv(): Promise<boolean> {
         formatLocalDate(e.endTime!),
         formatLocalTimeLong(e.endTime!),
         String(e.durationSeconds ?? 0),
+        e.note ?? "",
       ]),
     );
   }
@@ -110,6 +116,7 @@ export async function importEntriesCsv(): Promise<{ imported: number }> {
     endDate: idx("end date"),
     endTime: idx("end time"),
     duration: idx("duration"),
+    note: idx("note"),
   };
 
   const existingProjects = await projectsDb.listProjects();
@@ -170,6 +177,7 @@ export async function importEntriesCsv(): Promise<{ imported: number }> {
       tags: [],
       proofhubTimeEntryId: null,
       proofhubSyncedAt: null,
+      note: (col.note >= 0 ? row[col.note]?.trim() : "") || null,
     });
     imported++;
   }
@@ -273,6 +281,7 @@ export async function importClockifyCsv(): Promise<{ imported: number }> {
       tags: [],
       proofhubTimeEntryId: null,
       proofhubSyncedAt: null,
+      note: null,
     });
     imported++;
   }

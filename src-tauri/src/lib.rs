@@ -180,6 +180,12 @@ fn migrations() -> Vec<Migration> {
             "#,
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 5,
+            description: "add_entry_note",
+            sql: "ALTER TABLE time_entries ADD COLUMN note TEXT;",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

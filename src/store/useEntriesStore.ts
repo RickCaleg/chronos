@@ -69,8 +69,23 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
   },
 
   update: async (id, patch) => {
+    // Mirrors updateEntry in db/entries.ts: a content edit un-syncs the
+    // entry unless the patch sets proofhubSyncedAt itself — otherwise its
+    // ProofHub badge kept a stale checkmark until the next restart.
+    const unsyncs =
+      patch.proofhubSyncedAt === undefined &&
+      [
+        patch.description,
+        patch.taskNumber,
+        patch.projectId,
+        patch.startTime,
+        patch.endTime,
+        patch.durationSeconds,
+        patch.note,
+      ].some((v) => v !== undefined);
     const applyPatch = (e: TimeEntry): TimeEntry => ({
       ...e,
+      ...(unsyncs ? { proofhubSyncedAt: null } : {}),
       ...(patch.description !== undefined ? { description: patch.description } : {}),
       ...(patch.taskNumber !== undefined ? { taskNumber: patch.taskNumber } : {}),
       ...(patch.projectId !== undefined ? { projectId: patch.projectId } : {}),
@@ -79,6 +94,7 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
       ...(patch.durationSeconds !== undefined ? { durationSeconds: patch.durationSeconds } : {}),
       ...(patch.proofhubTimeEntryId !== undefined ? { proofhubTimeEntryId: patch.proofhubTimeEntryId } : {}),
       ...(patch.proofhubSyncedAt !== undefined ? { proofhubSyncedAt: patch.proofhubSyncedAt } : {}),
+      ...(patch.note !== undefined ? { note: patch.note } : {}),
     });
     // Apply optimistically, before the DB round-trip: the running entry's
     // description field is bound directly to this store, so waiting for
