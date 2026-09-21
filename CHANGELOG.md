@@ -4,6 +4,8 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.5.9] - 2026-09-21
 ### Added
 - "Check sent entries" in the ProofHub tab now also compares the other way. It lists your ProofHub entries in the mapped timesheets from the last 30 days that no Chronos entry was sent as (logged by hand there, or left over from an old send), and each can be deleted in ProofHub from there. Teammates' entries are ignored.
 - A group row has its own note, editable inline like a single entry's, which sets the note of every entry in the group. When the entries' notes differ, the group row says so.
