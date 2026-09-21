@@ -4,6 +4,8 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.5.8] - 2026-09-21
 ### Added
 - Every entry can have a note about what was done, shown in small text under its row and edited right there, from the row's note button or by clicking the note. This works inside grouped rows too. When sending to ProofHub, the note is used as the description instead of the entry's name. With "group pushes by day" on, an entry with a note is sent on its own, and the entries without one are still summed together.
 - Notes are included in exports: JSON backups and a new "Note" column at the end of the CSV, from both the app and `chronos-cli`. Both CSV importers read it back.
