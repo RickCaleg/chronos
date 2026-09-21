@@ -1,7 +1,9 @@
 use anyhow::Result;
 use std::collections::HashMap;
 
-pub const ENTRIES_CSV_HEADER: [&str; 8] = [
+// "Note" goes last so the older columns keep their positions; both
+// importers read by header name anyway.
+pub const ENTRIES_CSV_HEADER: [&str; 9] = [
     "Project",
     "Task",
     "Description",
@@ -10,6 +12,7 @@ pub const ENTRIES_CSV_HEADER: [&str; 8] = [
     "End Date",
     "End Time",
     "Duration",
+    "Note",
 ];
 
 /// Reads a CSV file into rows of `{lowercased header -> value}`, so lookups

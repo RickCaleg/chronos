@@ -42,10 +42,23 @@ pub enum Command {
         /// Start time: "now" (default), "14:30", or "2026-01-31 14:30"
         #[arg(long, default_value = "now")]
         at: String,
+        /// Comma-separated tag names, e.g. "meeting,billable" (created if new)
+        #[arg(long)]
+        tags: Option<String>,
+        /// A note about what was done (sent to ProofHub instead of the description)
+        #[arg(long)]
+        note: Option<String>,
     },
 
     /// Stop the currently running timer
     Stop,
+
+    /// Start a new timer with an existing entry's description, task and
+    /// project (stopping the running one first, if any)
+    Restart {
+        /// Entry id or unique prefix (see `chronos-cli list`)
+        id: String,
+    },
 
     /// Show the currently running timer, if any
     Status {
@@ -71,8 +84,14 @@ pub enum Command {
         /// Filter by project name, code, or id
         #[arg(long)]
         project: Option<String>,
+        /// Only entries with this tag
+        #[arg(long)]
+        tag: Option<String>,
         #[arg(long)]
         json: bool,
+        /// Print each day as the desktop app's "copy day" text instead of a table
+        #[arg(long, conflicts_with = "json")]
+        summary: bool,
     },
 
     /// Add a completed entry directly, without starting a timer
@@ -86,6 +105,12 @@ pub enum Command {
         task: Option<String>,
         #[arg(long)]
         project: Option<String>,
+        /// Comma-separated tag names, e.g. "meeting,billable" (created if new)
+        #[arg(long)]
+        tags: Option<String>,
+        /// A note about what was done (sent to ProofHub instead of the description)
+        #[arg(long)]
+        note: Option<String>,
     },
 
     /// Edit an existing entry. Only the fields you pass are changed.
@@ -93,7 +118,9 @@ pub enum Command {
     /// Editing --duration recomputes the end time (start stays fixed).
     /// Editing --start or --end recomputes the duration. Passing both
     /// --start and --end sets them directly. --duration and --end together
-    /// is rejected as ambiguous.
+    /// is rejected as ambiguous. On a running entry, --start moves its start
+    /// (like adjusting the start in the desktop app); --end/--duration need
+    /// it stopped.
     Edit {
         /// Entry id (see `chronos-cli list --json`)
         id: String,
@@ -111,6 +138,12 @@ pub enum Command {
         /// e.g. "1:30:00", "1:30", or minutes as a plain number
         #[arg(long)]
         duration: Option<String>,
+        /// Replaces the entry's tags (comma-separated); an empty string clears them
+        #[arg(long)]
+        tags: Option<String>,
+        /// Pass an empty string to clear it
+        #[arg(long)]
+        note: Option<String>,
     },
 
     /// Delete an entry
@@ -127,7 +160,13 @@ pub enum Command {
         action: ProjectsCommand,
     },
 
-    /// Export entries and projects to a file (or stdout with "-" / no --output)
+    /// Manage tags
+    Tags {
+        #[command(subcommand)]
+        action: TagsCommand,
+    },
+
+    /// Export everything to a file (or stdout with "-" / no --output)
     Export {
         #[arg(long, value_enum, default_value_t = ExportFormat::Json)]
         format: ExportFormat,
@@ -135,7 +174,7 @@ pub enum Command {
         output: Option<PathBuf>,
     },
 
-    /// Import entries and projects from a file
+    /// Import from a file
     ///
     /// JSON replaces all current data. CSV and Clockify CSV append to it.
     Import {
@@ -147,7 +186,7 @@ pub enum Command {
         yes: bool,
     },
 
-    /// Permanently delete every project and time entry
+    /// Permanently delete every project, time entry and tag
     Reset {
         /// Skip the confirmation prompt
         #[arg(long)]
@@ -200,6 +239,25 @@ pub enum ProjectsCommand {
     /// Delete a project (its entries become unassigned, not deleted)
     Remove {
         project: String,
+        #[arg(long)]
+        yes: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum TagsCommand {
+    /// List tags
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Create a tag
+    Add { name: String },
+    /// Rename a tag
+    Rename { tag: String, new_name: String },
+    /// Delete a tag (entries just lose it)
+    Remove {
+        tag: String,
         #[arg(long)]
         yes: bool,
     },

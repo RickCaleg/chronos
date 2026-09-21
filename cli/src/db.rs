@@ -30,6 +30,13 @@ pub fn open(path: &Path) -> Result<Connection> {
     Ok(conn)
 }
 
+/// Whether `time_entries.note` exists yet — see `ensure_schema`.
+pub fn has_note_column(conn: &Connection) -> Result<bool> {
+    Ok(conn
+        .prepare("SELECT 1 FROM pragma_table_info('time_entries') WHERE name = 'note'")?
+        .exists([])?)
+}
+
 /// Idempotent schema setup. Mirrors the desktop app's migrations exactly, but
 /// never touches the app's own `_sqlx_migrations` bookkeeping table — this
 /// only ever runs `CREATE TABLE IF NOT EXISTS`, so it's a no-op against a
@@ -56,7 +63,8 @@ fn ensure_schema(conn: &Connection) -> Result<()> {
             duration_seconds INTEGER,
             is_running INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            note TEXT
         );
 
         CREATE INDEX IF NOT EXISTS idx_time_entries_start_time ON time_entries(start_time);
@@ -97,6 +105,13 @@ fn ensure_schema(conn: &Connection) -> Result<()> {
         conn.execute("ALTER TABLE time_entries ADD COLUMN proofhub_time_entry_id TEXT", [])?;
         conn.execute("ALTER TABLE time_entries ADD COLUMN proofhub_synced_at TEXT", [])?;
     }
+
+    // `time_entries.note` (desktop migration 5) is part of the table only
+    // when the CLI creates it. It's deliberately *not* added to an existing
+    // table: on a database the app hadn't migrated yet, the app's own
+    // `ADD COLUMN note` would then fail as a duplicate and block its
+    // startup. The CLI copes with the column being absent instead (see
+    // `has_note_column`).
 
     Ok(())
 }

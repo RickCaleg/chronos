@@ -4,6 +4,21 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Added
+- Every entry can have a note about what was done, shown in small text under its row and edited right there, from the row's note button or by clicking the note. This works inside grouped rows too. When sending to ProofHub, the note is used as the description instead of the entry's name. With "group pushes by day" on, an entry with a note is sent on its own, and the entries without one are still summed together.
+- Notes are included in exports: JSON backups and a new "Note" column at the end of the CSV, from both the app and `chronos-cli`. Both CSV importers read it back.
+- `chronos-cli` now covers everything in the app that isn't desktop-only:
+  - Tags: `--tags` on `start`/`add`/`edit`, `list --tag`, and a `tags` command (list, add, rename, remove).
+  - Notes: `--note` on `start`/`add`/`edit`.
+  - `restart` continues an existing entry, like the app's ▶ button.
+  - `list --summary` prints the app's "copy day" text.
+  - `edit --start` works on the running entry.
+  - `list` shows tags and notes.
+### Fixed
+- `chronos-cli` JSON backups lost data: the tags, and the record of what was already sent to ProofHub. Importing a backup through the CLI dropped both, and restoring one made the app offer to send everything again. Both now round-trip, and `reset` also erases tags.
+- Editing or deleting an entry through `chronos-cli` didn't mark it (or the rest of its grouped push) for resending to ProofHub like the app does. It now does.
+- Automatic backups left out the tag list, so restoring one removed every tag from the restored entries. Automatic backups now include tags, like manual ones, and restoring an older automatic backup rebuilds the tags from its entries.
+- Editing a sent entry (description, times, project) didn't show it as needing a resend until Chronos was restarted. It now does right away.
 
 ## [0.5.7] - 2026-09-21
 ### Added

@@ -55,7 +55,8 @@ flags. What follows are the highlights.
 ### `start` / `stop` / `status`
 
 ```sh
-chronos-cli start "Fix login bug" --task '#1234' --project WEB
+chronos-cli start "Fix login bug" --task '#1234' --project WEB --tags "client,billable"
+chronos-cli restart a1b2c3d4   # stops what's running and continues that entry, like the app's ▶ button
 chronos-cli status
 chronos-cli status --json
 chronos-cli stop
@@ -64,6 +65,9 @@ chronos-cli stop
 - Only one timer can run at a time; `start` fails loudly if one is already running.
 - `--project` matches a project's id, exact name, or short code (case-insensitive).
 - `--at` lets you backdate the start (`--at "14:30"`, `--at "2026-01-31 14:30"`, or the default `now`).
+- `--tags` takes comma-separated names, creating tags that don't exist yet (case-insensitive, like the app).
+- `--note` (also on `add`/`edit`) stores a note about what was done; the desktop app sends it to ProofHub instead of the description.
+- `restart` copies the description, task and project of an existing entry, like the desktop app.
 - `status --json` is the one to poll from a script or a bar widget — see below.
 
 ### `list`
@@ -74,7 +78,15 @@ chronos-cli list --yesterday
 chronos-cli list --date 2026-01-31
 chronos-cli list --from 2026-01-01 --to 2026-02-01
 chronos-cli list --project APP --json
+chronos-cli list --tag billable
+chronos-cli list --yesterday --summary  # the app's "copy day" text, ready to paste
 ```
+
+The table shows each entry's tags after it and its note, if any, on the lines
+below. `--json` includes `tags`, `note` and the ProofHub sync fields.
+`--summary` prints one block per day (`dd/mm`, then ` - #task - CODE -
+description`), with repeated task/description/project combinations listed
+once.
 
 ### `add` / `edit` / `delete`
 
@@ -93,11 +105,32 @@ or the first column of the plain-text table both give you one:
 chronos-cli edit a1b2c3d4 --description "Daily standup (async)"
 chronos-cli edit a1b2c3d4 --start "09:05"          # keeps end fixed, recomputes duration
 chronos-cli edit a1b2c3d4 --duration "0:20:00"     # keeps start fixed, recomputes end
+chronos-cli edit a1b2c3d4 --tags "meeting"          # replaces the tags; "" clears them
+chronos-cli edit a1b2c3d4 --note "Went over the PR" # "" clears it
 chronos-cli delete a1b2c3d4 --yes
 ```
 
 `--end` and `--duration` together are rejected — pick one, since they'd
-otherwise disagree about where the entry ends.
+otherwise disagree about where the entry ends. On the running entry only
+`--start` (not in the future) and the non-time fields can be changed, like
+adjusting the start in the app.
+
+Like the desktop app, editing anything but the tags of an entry already sent
+to ProofHub marks it for resending, and deleting one entry of a grouped push
+marks the rest of that group. Sending itself only happens in the app.
+
+Notes need a database an up-to-date desktop app has already upgraded (just
+open the app once). The CLI deliberately doesn't add that column to an
+existing database itself, since the app's own upgrade would then fail.
+
+### `tags`
+
+```sh
+chronos-cli tags list
+chronos-cli tags add urgent
+chronos-cli tags rename urgent asap
+chronos-cli tags remove asap --yes   # entries just lose the tag
+```
 
 ### `projects`
 
@@ -113,20 +146,24 @@ chronos-cli projects remove WEB --yes   # entries keep the project's name/id as 
 ### `export` / `import` / `reset`
 
 ```sh
-# Full backup (same format the desktop app's "Export full backup" produces)
+# Full backup (same format the desktop app's "Export full backup" produces:
+# projects, entries with their tags, notes and ProofHub sync state, and tags)
 chronos-cli export --format json --output ~/backups/chronos-$(date +%F).json
 
 # Or straight to stdout, e.g. to pipe into gzip
 chronos-cli export --format json | gzip > backup.json.gz
 
-chronos-cli export --format csv --output entries.csv
+chronos-cli export --format csv --output entries.csv   # same columns as the app's CSV, "Note" last
 
 chronos-cli import --format json backup.json --yes   # REPLACES all current data
 chronos-cli import --format csv entries.csv           # appends
 chronos-cli import --format clockify export.csv       # appends, pt-BR Clockify export columns
 
-chronos-cli reset --yes   # erases everything — same as the app's "Start fresh"
+chronos-cli reset --yes   # erases everything, tags included — same as the app's "Start fresh"
 ```
+
+A JSON import restores tags too. Older automatic backups from the app have
+no separate tag list; the CLI rebuilds it from the entries, same as the app.
 
 Both CSV importers apply the same "`#task - CODE - description`" splitting
 rule the desktop app uses for paste-autofill: if a row has no task number of
