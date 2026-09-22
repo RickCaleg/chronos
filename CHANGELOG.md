@@ -5,7 +5,7 @@ All notable changes to Chronos are documented here. Format loosely follows
 
 ## [Unreleased]
 ### Added
-- A web version: the same app in a browser, with every entry stored locally in that browser (SQLite in WebAssembly), so the server never sees anyone's data. Tray, global shortcut, autostart, automatic folder backups, the updater, the Omarchy theme and ProofHub are desktop only. JSON backups move freely between the two. Self-host it with Docker (`compose.yaml`, automatic HTTPS through Caddy). An image is published to GHCR on each release. See `docs/WEB.md`.
+- A web version: the same app in a browser, with every entry stored locally in that browser (SQLite in WebAssembly), so the server never sees anyone's data. The ProofHub integration works there too: the browser talks to ProofHub directly, and the API key is stored encrypted in that browser. Tray, global shortcut, autostart, automatic folder backups, the updater and the Omarchy theme are desktop only. JSON backups move freely between the two. Self-host it with Docker (`compose.yaml`, automatic HTTPS through Caddy). An image is published to GHCR on each release. See `docs/WEB.md`.
 
 ## [0.5.12] - 2026-09-21
 ### Added

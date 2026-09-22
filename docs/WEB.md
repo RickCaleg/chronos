@@ -15,7 +15,8 @@ every visitor has their own separate data.
 | Tray, global shortcut, start with the system | ✓ | — (the tab title shows `●` while a timer runs) |
 | Automatic backups to a folder | ✓ | — (export a backup by hand) |
 | Self-updater | ✓ | — (a reload picks up whatever the server serves) |
-| Omarchy theme, ProofHub integration, `chronos-cli` | ✓ | — |
+| ProofHub integration | ✓ | ✓ (the browser calls ProofHub directly) |
+| Omarchy theme, `chronos-cli` | ✓ | — |
 
 Things to know:
 
@@ -26,6 +27,9 @@ Things to know:
   keep its storage persistent, but a backup is the only real safety net.
 - Only **one tab** can use Chronos at a time. A second tab shows a message
   instead of risking conflicting writes.
+- With ProofHub connected, the browser talks to `<subdomain>.proofhub.com`
+  directly; the Chronos server never sees the API key or the hours sent. The
+  key is stored encrypted in that browser, so each browser connects once.
 - It needs **HTTPS** (or `localhost`): browsers only allow this storage on
   secure connections. Over plain `http://<ip>` it shows "This browser can't run Chronos".
 - Private/incognito windows may refuse or discard the storage.
@@ -193,6 +197,7 @@ docker run --rm --network host -v "$PWD/docker":/t:ro -w /tmp \
 | Domain mode: no certificate | DNS must point at the server and ports 80 and 443 must be reachable from the internet. Check `docker compose logs chronos`. |
 | Tunnel: `Error 1033` / hostname doesn't load | `cloudflared` isn't connected: check `docker compose logs cloudflared` and the token in `.env`. |
 | Tunnel: `Bad gateway` (502) | The public hostname's URL must be `http://chronos:80`, not `localhost`. |
+| ProofHub: "network error: Failed to fetch" | The subdomain doesn't exist (check the part before `.proofhub.com`), or something blocks `*.proofhub.com` (an ad blocker, or a CSP changed in `docker/Caddyfile`). |
 | Tunnel: console CSP errors, blank page | A Cloudflare feature injects scripts: turn off Rocket Loader, Email Obfuscation and Web Analytics injection. |
 | `address already in use` on start | Another service uses port 80/443. Stop it, or use `CHRONOS_HTTP_PORT`/`CHRONOS_HTTPS_PORT` behind that service. |
 | Data disappeared | The browser's site data was cleared, or a different address/port/browser is in use (each is separate storage). Restore from a JSON backup. |
@@ -232,6 +237,9 @@ To test the production image locally: `docker compose up --build` with
 - `src/platform/web/db.worker.ts` runs SQLite in a Web Worker on the
   `opfs-sahpool` VFS, and applies `src/platform/web/migrations.ts`, a copy of
   the desktop migrations in `src-tauri/src/lib.rs`.
+- `src/platform/web/proofhub/` is the ProofHub integration for the browser:
+  a TypeScript port of `proofhub-plugin/src/main.rs` plus encrypted credential
+  storage. See [`proofhub-integration.md` §14](proofhub-integration.md#14-web-version).
 - `docker/Caddyfile` serves `dist-web/` with a strict Content-Security-Policy,
   long caching for hashed assets, and no caching for `index.html`. Its
   `default_sni` makes IP mode work: clients send no SNI to an IP, and inside
@@ -256,6 +264,8 @@ To test the production image locally: `docker compose up --build` with
 - A new native feature gets a nullable member in `Platform`, so TypeScript
   forces both implementations to decide what to do with it.
 - A new user-facing string in either build goes in both `en.json` and `pt-BR.json`.
+- A change to the ProofHub plugin (`proofhub-plugin/src/main.rs`) must be
+  mirrored in `src/platform/web/proofhub/api.ts`, and vice versa.
 
 ### Release checklist
 

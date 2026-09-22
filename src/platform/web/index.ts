@@ -1,5 +1,6 @@
 import type { Database, FileFilter, Platform, StartupResult } from "../types";
 import type { WorkerRequest, WorkerResponse } from "./db.worker";
+import { webProofHub } from "./proofhub";
 
 let database: Database | null = null;
 
@@ -122,5 +123,5 @@ export const platform: Platform = {
   autostart: null,
   updater: null,
   backupFolder: null,
-  proofhub: null,
+  proofhub: webProofHub,
 };

@@ -351,6 +351,9 @@ mirroring `useAutoBackupStore`'s shape for the non-secret fields.
 
 ## 5. Credential storage — where the API key actually lives
 
+(This section describes the desktop app. The web version works differently,
+see [§14](#14-web-version).)
+
 Unchanged in spirit from the original design, refined for the
 process-boundary in §3: the credential is decrypted **only in the main
 app's Rust process**, in memory, immediately before a `proofhub_plugin_call`
@@ -699,3 +702,33 @@ ask), targeting v0.5.0:**
    binaries.** `proofhub_plugin_install` fetches from the running app's
    own version tag, so the install button has nothing to download until a
    v0.5.0 (or later) release is cut with this workflow.
+
+## 14. Web version
+
+The browser build ([`docs/WEB.md`](WEB.md)) has the same integration and the
+same UI, with the plugin replaced by a TypeScript port of it:
+
+- **`src/platform/web/proofhub/api.ts`** mirrors `proofhub-plugin/src/main.rs`
+  action for action (same request and response shapes, same exists-checks,
+  same handling of 200-with-`success: false` bodies and of 429s). A change to
+  one must be made in the other.
+- **The browser calls ProofHub directly.** ProofHub's API answers CORS
+  preflights with `Access-Control-Allow-Origin: *` and allows the
+  `X-API-KEY`/`Content-Type` headers, so no server-side proxy is involved and
+  the key never passes through the Chronos server. The browser sends its own
+  `User-Agent` (it can't be set from a page). The Content-Security-Policy in
+  `docker/Caddyfile` allows `connect-src https://*.proofhub.com` for this.
+  Every call is preceded by a preflight, which may count against the rate
+  limit; the 429 retry covers it.
+- **"Install"** only turns the integration on (`chronos.proofhub.installed`
+  in `localStorage`). Its code is split into chunks the page only fetches,
+  from the Chronos server, when the integration is used; nothing contacts
+  ProofHub before that. Uninstall keeps the credentials, as on desktop.
+- **Credentials** are AES-GCM encrypted in IndexedDB (`chronos-secrets`)
+  under a browser-generated non-extractable `CryptoKey`
+  (`src/platform/web/proofhub/credentials.ts`). They're outside the SQLite
+  database, so never in a backup. Unlike desktop, the page's own JavaScript
+  necessarily handles the key when making calls; the strict CSP is what keeps
+  other scripts off the page.
+- **The debug log** is the last request/response in `localStorage`
+  (`chronos.proofhub.debugLog`), with the API key redacted.
