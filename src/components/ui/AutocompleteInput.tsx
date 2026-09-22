@@ -65,7 +65,7 @@ export function AutocompleteInput({
         setHighlight((h) => (h - 1 + filtered.length) % filtered.length);
         return;
       }
-      if (e.key === "Enter") {
+      if (e.key === "Enter" && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         pick(filtered[highlight]);
         return;

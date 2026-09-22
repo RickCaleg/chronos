@@ -25,7 +25,14 @@ export function TimerBar() {
   const suggestionByDisplay = useMemo(() => new Map(suggestions.map((s) => [s.display, s])), [suggestions]);
 
   const isRunning = !!runningEntry;
-  const combinedValue = isRunning ? combineTaskDescription(runningEntry.taskNumber, runningEntry.description) : draft;
+
+  // The field always shows the raw text, never a value rebuilt from the saved
+  // task/description: while the timer ran, rebuilding it ate the space after
+  // "#123" on every keystroke, so the rest of the line ended up glued to the
+  // task number. It resyncs whenever another timer becomes the running one.
+  useEffect(() => {
+    setDraft(runningEntry ? combineTaskDescription(runningEntry.taskNumber, runningEntry.description) : "");
+  }, [runningEntry?.id]);
 
   useEffect(() => {
     if (!runningEntry) {
@@ -61,7 +68,6 @@ export function TimerBar() {
   async function handleStart() {
     const { taskNumber, description } = splitTaskDescription(draft.trim());
     await start({ description, taskNumber, projectId, startTime: nowIso() });
-    setDraft("");
     setProjectId(null);
   }
 
@@ -72,11 +78,10 @@ export function TimerBar() {
   }
 
   function handleCombinedChange(raw: string) {
+    setDraft(raw);
     if (isRunning) {
       const { taskNumber, description } = splitTaskDescription(raw);
       update(runningEntry.id, { taskNumber, description });
-    } else {
-      setDraft(raw);
     }
   }
 
@@ -92,15 +97,15 @@ export function TimerBar() {
     if (!parsed) return;
     e.preventDefault();
     const matched = parsed.aliasToken ? matchProjectByAlias(parsed.aliasToken, projects) : null;
+    setDraft(combineTaskDescription(parsed.taskNumber, parsed.description));
     if (isRunning) {
       update(runningEntry.id, {
         taskNumber: parsed.taskNumber,
         description: parsed.description,
         ...(matched ? { projectId: matched.id } : {}),
       });
-    } else {
-      setDraft(combineTaskDescription(parsed.taskNumber, parsed.description));
-      if (matched) setProjectId(matched.id);
+    } else if (matched) {
+      setProjectId(matched.id);
     }
   }
 
@@ -110,7 +115,7 @@ export function TimerBar() {
       className="flex flex-wrap items-center gap-2 rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-3"
     >
       <AutocompleteInput
-        value={combinedValue}
+        value={draft}
         onChange={handleCombinedChange}
         onSelect={handleSelectSuggestion}
         onKeyDown={handleStartKeyDown}

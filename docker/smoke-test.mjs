@@ -32,6 +32,19 @@ try {
   await page.getByText("web smoke test").first().waitFor({ timeout: 10000 });
   step("entry persisted across reload");
 
+  // Typing into the field while the timer runs: the text must reach the entry
+  // as typed, spaces included (rebuilding it from task+description ate them).
+  const typed = "#99 typed while running";
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await page.getByRole("button", { name: "Stop", exact: true }).waitFor();
+  await input.click();
+  await input.pressSequentially(typed, { delay: 30 });
+  await page.getByRole("button", { name: "Stop", exact: true }).click();
+  await page.waitForTimeout(500);
+  await page.reload();
+  await page.getByText("typed while running").first().waitFor({ timeout: 10000 });
+  step("description typed while the timer runs is saved");
+
   const page2 = await ctx.newPage();
   await page2.goto(URL);
   await page2.getByText("already open in another tab").waitFor({ timeout: 10000 });
@@ -45,8 +58,12 @@ try {
   ]);
   const backupPath = await download.path();
   const backup = JSON.parse(readFileSync(backupPath, "utf8"));
-  const entry = backup.timeEntries?.[0];
-  if (backup.timeEntries?.length !== 1 || entry.taskNumber !== "#1234" || entry.description !== "web smoke test") {
+  const entry = backup.timeEntries?.find((e) => e.taskNumber === "#1234");
+  const running = backup.timeEntries?.find((e) => e.taskNumber === "#99");
+  if (running?.description !== "typed while running") {
+    throw new Error(`description typed while running was mangled: ${JSON.stringify(running)}`);
+  }
+  if (backup.timeEntries?.length !== 2 || entry.taskNumber !== "#1234" || entry.description !== "web smoke test") {
     throw new Error(`unexpected backup content: ${JSON.stringify(backup.timeEntries)}`);
   }
   step("JSON backup exported");

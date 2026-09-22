@@ -9,6 +9,8 @@ All notable changes to Chronos are documented here. Format loosely follows
 ### Added
 - A web version: the same app in a browser, with every entry stored locally in that browser (SQLite in WebAssembly), so the server never sees anyone's data. The ProofHub integration works there too: the browser talks to ProofHub directly, and the API key is stored encrypted in that browser. Tray, global shortcut, autostart, automatic folder backups, the updater and the Omarchy theme are desktop only. JSON backups move freely between the two. Self-host it with Docker (`compose.yaml`, automatic HTTPS through Caddy, optional Cloudflare Tunnel), with HSTS, a strict Content-Security-Policy and hardened containers. An image is published to GHCR on each release. See `docs/WEB.md`.
 ### Fixed
+- Typing a description while the timer is running works: the text is now kept exactly as typed. Before, the space after `#123` was swallowed on every keystroke, so "#123 fix login" ended up saved as the task number `#123fixlogin` with no description.
+- Ctrl+Enter with the autocomplete list open starts/stops the timer instead of picking the highlighted suggestion.
 - Chronos slowed down as the history grew: with a few thousand entries it took seconds to open, and to start or stop the timer. The list now shows the last 30 days with entries, with a button for more, and rows only redraw when their own entry changes. With 5,000 entries: opening goes from 15 s to about 1 s, starting/stopping the timer from over 10 s to under 0.2 s (measured on the web version; the desktop app runs the same code).
 - Importing a backup or CSV writes all entries in one go on the web version: 5,000 entries went from almost 2 minutes to about 2 seconds.
 ### Security
