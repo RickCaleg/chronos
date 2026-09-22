@@ -4,13 +4,15 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.6.0] - 2026-09-22
+### Added
+- A web version: the same app in a browser, with every entry stored locally in that browser (SQLite in WebAssembly), so the server never sees anyone's data. The ProofHub integration works there too: the browser talks to ProofHub directly, and the API key is stored encrypted in that browser. Tray, global shortcut, autostart, automatic folder backups, the updater and the Omarchy theme are desktop only. JSON backups move freely between the two. Self-host it with Docker (`compose.yaml`, automatic HTTPS through Caddy, optional Cloudflare Tunnel), with HSTS, a strict Content-Security-Policy and hardened containers. An image is published to GHCR on each release. See `docs/WEB.md`.
 ### Fixed
 - Chronos slowed down as the history grew: with a few thousand entries it took seconds to open, and to start or stop the timer. The list now shows the last 30 days with entries, with a button for more, and rows only redraw when their own entry changes. With 5,000 entries: opening goes from 15 s to about 1 s, starting/stopping the timer from over 10 s to under 0.2 s (measured on the web version; the desktop app runs the same code).
 - Importing a backup or CSV writes all entries in one go on the web version: 5,000 entries went from almost 2 minutes to about 2 seconds.
 ### Security
 - The ProofHub plugin rejects a subdomain that isn't a single label, so a pasted URL can't send the API key to another host, and escapes ids placed in request paths.
-### Added
-- A web version: the same app in a browser, with every entry stored locally in that browser (SQLite in WebAssembly), so the server never sees anyone's data. The ProofHub integration works there too: the browser talks to ProofHub directly, and the API key is stored encrypted in that browser. Tray, global shortcut, autostart, automatic folder backups, the updater and the Omarchy theme are desktop only. JSON backups move freely between the two. Self-host it with Docker (`compose.yaml`, automatic HTTPS through Caddy, optional Cloudflare Tunnel), with HSTS, a strict Content-Security-Policy and hardened containers. An image is published to GHCR on each release. See `docs/WEB.md`.
 
 ## [0.5.12] - 2026-09-21
 ### Added
