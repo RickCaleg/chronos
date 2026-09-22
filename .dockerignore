@@ -1,0 +1,10 @@
+*
+!package.json
+!package-lock.json
+!index.html
+!tsconfig.json
+!tsconfig.node.json
+!vite.config.ts
+!public
+!src
+!docker

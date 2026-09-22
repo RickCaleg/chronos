@@ -16,6 +16,7 @@ import {
 import type { View } from "./TopNav";
 import { useEntriesStore } from "../store/useEntriesStore";
 import { useUpdaterStore } from "../store/useUpdaterStore";
+import { platform } from "@platform";
 import { exportJsonBackup, importJsonBackup } from "../lib/exportImport";
 import { nowIso } from "../lib/time";
 import { discardRunningTimer } from "./timer/discardTimer";
@@ -84,13 +85,15 @@ export function CommandPalette({ open, onClose, onNavigate }: CommandPaletteProp
       { id: "go-settings", labelKey: "palette.goSettings", icon: Settings, run: () => onNavigate("settings") },
       { id: "export-backup", labelKey: "palette.exportBackup", icon: Download, run: () => void exportJsonBackup() },
       { id: "import-backup", labelKey: "palette.importBackup", icon: Upload, run: () => void importJsonBackup() },
-      {
+    );
+    if (platform.updater) {
+      list.push({
         id: "check-updates",
         labelKey: "palette.checkUpdates",
         icon: RefreshCw,
         run: () => useUpdaterStore.getState().checkForUpdates(),
-      },
-    );
+      });
+    }
     return list;
   }, [runningEntry, onNavigate, t]);
 

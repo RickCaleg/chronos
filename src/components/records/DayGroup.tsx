@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, Copy, Loader2, RefreshCw, SearchCheck, Send } from "lucide-react";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { platform } from "@platform";
 import { confirm } from "../ui/ConfirmDialog";
 import type { Project, TimeEntry } from "../../types";
 import type { EntryOrGroup } from "../../lib/grouping";
@@ -162,7 +162,7 @@ export function DayGroup({ dayKey, label, items, runningEntry }: DayGroupProps) 
       lines.unshift(formatEntryLine(runningEntry, projects.find((p) => p.id === runningEntry.projectId) ?? null));
     }
     const dateLabel = referenceEntry ? formatDateShort(referenceEntry.startTime) : "";
-    await writeText([dateLabel, ...lines].join("\n"));
+    await platform.copyText([dateLabel, ...lines].join("\n"));
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }

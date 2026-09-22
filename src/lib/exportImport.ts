@@ -1,5 +1,4 @@
-import { save, open } from "@tauri-apps/plugin-dialog";
-import { writeTextFile, readTextFile } from "@tauri-apps/plugin-fs";
+import { platform } from "@platform";
 import type { Backup, Project, TimeEntry } from "../types";
 import * as projectsDb from "../db/projects";
 import * as entriesDb from "../db/entries";
@@ -9,6 +8,9 @@ import { combineLocalDateTime, durationBetween, formatLocalDate, formatLocalTime
 import { pickColor } from "../store/useProjectsStore";
 import { resolveImportedEntryFields } from "./pasteParser";
 
+const JSON_FILTER = { name: "JSON", extensions: ["json"] };
+const CSV_FILTER = { name: "CSV", extensions: ["csv"] };
+
 export async function exportJsonBackup(): Promise<boolean> {
   const [projects, timeEntries, tags] = await Promise.all([
     projectsDb.listProjects(),
@@ -17,14 +19,7 @@ export async function exportJsonBackup(): Promise<boolean> {
   ]);
   const backup: Backup = { version: 1, exportedAt: nowIso(), projects, timeEntries, tags };
 
-  const path = await save({
-    defaultPath: `chronos-backup-${formatLocalDate(nowIso())}.json`,
-    filters: [{ name: "JSON", extensions: ["json"] }],
-  });
-  if (!path) return false;
-
-  await writeTextFile(path, JSON.stringify(backup, null, 2));
-  return true;
+  return platform.saveTextFile(`chronos-backup-${formatLocalDate(nowIso())}.json`, JSON.stringify(backup, null, 2), JSON_FILTER);
 }
 
 export async function resetAllData(): Promise<void> {
@@ -35,13 +30,8 @@ export async function resetAllData(): Promise<void> {
 }
 
 export async function importJsonBackup(): Promise<boolean> {
-  const path = await open({
-    multiple: false,
-    filters: [{ name: "JSON", extensions: ["json"] }],
-  });
-  if (!path || Array.isArray(path)) return false;
-
-  const content = await readTextFile(path);
+  const content = await platform.openTextFile(JSON_FILTER);
+  if (content === null) return false;
   const backup = JSON.parse(content) as Backup;
 
   if (!backup || backup.version !== 1 || !Array.isArray(backup.projects) || !Array.isArray(backup.timeEntries)) {
@@ -84,24 +74,12 @@ export async function exportEntriesCsv(): Promise<boolean> {
     );
   }
 
-  const path = await save({
-    defaultPath: `chronos-entries-${formatLocalDate(nowIso())}.csv`,
-    filters: [{ name: "CSV", extensions: ["csv"] }],
-  });
-  if (!path) return false;
-
-  await writeTextFile(path, lines.join("\n"));
-  return true;
+  return platform.saveTextFile(`chronos-entries-${formatLocalDate(nowIso())}.csv`, lines.join("\n"), CSV_FILTER);
 }
 
 export async function importEntriesCsv(): Promise<{ imported: number }> {
-  const path = await open({
-    multiple: false,
-    filters: [{ name: "CSV", extensions: ["csv"] }],
-  });
-  if (!path || Array.isArray(path)) return { imported: 0 };
-
-  const content = await readTextFile(path);
+  const content = await platform.openTextFile(CSV_FILTER);
+  if (content === null) return { imported: 0 };
   const rows = parseCsv(content);
   if (rows.length === 0) return { imported: 0 };
 
@@ -201,13 +179,8 @@ function parseClockifyDate(dateStr: string, timeStr: string): string | null {
 
 /** Imports a Clockify CSV export (pt-BR column names: Projeto, Descrição, Tarefa, Data/Hora de início/término). */
 export async function importClockifyCsv(): Promise<{ imported: number }> {
-  const path = await open({
-    multiple: false,
-    filters: [{ name: "CSV", extensions: ["csv"] }],
-  });
-  if (!path || Array.isArray(path)) return { imported: 0 };
-
-  const content = await readTextFile(path);
+  const content = await platform.openTextFile(CSV_FILTER);
+  if (content === null) return { imported: 0 };
   const rows = parseCsv(content);
   if (rows.length === 0) return { imported: 0 };
 

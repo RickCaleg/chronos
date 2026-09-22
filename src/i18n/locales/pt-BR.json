@@ -168,7 +168,9 @@
     "groupAppearance": "Aparência",
     "groupSystem": "Sistema",
     "groupIntegrations": "Integrações",
-    "groupData": "Dados e backup"
+    "groupData": "Dados e backup",
+    "dataDescriptionWeb": "O Chronos guarda tudo neste navegador, neste dispositivo. Nada é enviado ao servidor. Limpar os dados deste site apaga tudo, então exporte um backup com frequência.",
+    "webUpdatesNote": "A versão web se atualiza quando o servidor é atualizado. Recarregue a página para usar a versão mais recente."
   },
   "common": {
     "cancel": "Cancelar",
@@ -264,5 +266,11 @@
   },
   "confirm": {
     "ok": "OK"
+  },
+  "startup": {
+    "otherTabTitle": "O Chronos já está aberto em outra aba",
+    "otherTabBody": "Seus dados só podem ser usados por uma aba de cada vez. Feche a outra aba e recarregue esta.",
+    "unsupportedTitle": "Este navegador não consegue rodar o Chronos",
+    "unsupportedBody": "O Chronos precisa de um navegador recente e de uma conexão segura (HTTPS) para guardar seus dados localmente. Janelas anônimas também podem bloquear isso."
   }
 }

@@ -13,7 +13,8 @@ You'll need Node.js 20+, a stable Rust toolchain, and the platform prerequisites
 
 ## Before opening a PR
 
-- `npm run build` (TypeScript + Vite) and `cargo check --workspace` should both pass cleanly.
+- `npm run build` (TypeScript + Vite), `npm run build:web` and `cargo check --workspace` should all pass cleanly.
+- The same frontend also ships as a web version ([`docs/WEB.md`](docs/WEB.md)). Don't import `@tauri-apps/*` outside `src/platform/tauri.ts`: go through `@platform`, and add a nullable member to `Platform` (`src/platform/types.ts`) for anything the browser can't do. A new migration also goes in `src/platform/web/migrations.ts`.
 - If you touch `cli/`, also run `cargo test -p chronos-cli` and `cargo clippy -p chronos-cli --all-targets`. The desktop app and the CLI both talk to the same SQLite schema (defined once in `src-tauri/src/lib.rs`'s migrations, mirrored idempotently in `cli/src/db.rs::ensure_schema`) — if you change the schema, update both, and never edit an already-shipped migration's SQL text (it's checksummed; add a new migration instead).
 - If you touch any user-facing string, add it to **both** `src/i18n/locales/en.json` and `src/i18n/locales/pt-BR.json`. A key present in only one language will silently fall back to English for the other.
 - The UI follows a deliberately squared design system: corners use `rounded-[2px]` (or `rounded-[1px]` for small color swatches), not Tailwind's `rounded-lg`/`rounded-xl` scale. Colors are always the CSS custom properties in `src/index.css` (`var(--color-*)`), never hardcoded Tailwind colors — the whole point is that light/dark/Omarchy themes recolor the entire app without touching component code.

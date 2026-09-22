@@ -40,6 +40,19 @@ jobs:
       - name: Type-check and build frontend
         run: npm run build
 
+      - name: Build web version
+        run: npx vite build --mode web
+
+      - name: Keep Tauri imports inside src/platform/tauri.ts
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          offenders=$(grep -rlE "from \"@tauri-apps/|import\(\"@tauri-apps/" src --include=*.ts --include=*.tsx | grep -vx "src/platform/tauri.ts" || true)
+          if [ -n "$offenders" ]; then
+            echo "Import Tauri APIs through @platform (see src/platform/types.ts), not directly in:"
+            echo "$offenders"
+            exit 1
+          fi
+
       - name: Check Rust workspace (desktop app + CLI)
         run: cargo check --workspace
 

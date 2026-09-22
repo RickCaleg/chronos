@@ -1,14 +1,14 @@
 import { create } from "zustand";
-import { invoke } from "@tauri-apps/api/core";
+import { platform } from "@platform";
 import type { Tag, TimeEntry } from "../types";
 import * as entriesDb from "../db/entries";
 import * as tagsDb from "../db/tags";
 import { durationBetween, nowIso } from "../lib/time";
 import type { EntryPatch } from "../db/entries";
 
-/** Best-effort: keeps the tray menu's "Start/Stop Timer" label in sync. No-ops quietly if the tray isn't available (e.g. a bare window manager without a status area). */
+/** Keeps the tray menu's "Start/Stop Timer" label (desktop) or the tab title (web) in sync. */
 function syncTrayLabel(running: boolean) {
-  invoke("set_tray_timer_label", { running }).catch(() => {});
+  platform.setTimerRunning(running);
 }
 
 interface EntriesState {

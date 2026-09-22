@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { invoke } from "@tauri-apps/api/core";
+import { platform } from "@platform";
 import { darken, lighten } from "../lib/color";
 
 export type ThemePreference = "system" | "light" | "dark" | "omarchy";
@@ -22,12 +22,8 @@ const OMARCHY_VARS = [
 type OmarchyColors = Record<string, string>;
 
 async function fetchOmarchyTheme(): Promise<OmarchyColors | null> {
-  try {
-    const colors = await invoke<OmarchyColors | null>("get_omarchy_theme");
-    return colors && colors.background && colors.foreground && colors.accent ? colors : null;
-  } catch {
-    return null;
-  }
+  const colors = await platform.omarchyTheme();
+  return colors && colors.background && colors.foreground && colors.accent ? colors : null;
 }
 
 function applyOmarchyColors(colors: OmarchyColors) {

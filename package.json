@@ -13,11 +13,15 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "dev:web": "vite --mode web",
+    "build:web": "tsc && vite build --mode web",
+    "preview:web": "vite preview --mode web",
     "preview": "vite preview",
     "tauri": "tauri"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
+    "@sqlite.org/sqlite-wasm": "^3.53.4-build1",
     "@tailwindcss/vite": "^4.3.3",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-autostart": "^2.5.1",

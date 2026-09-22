@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { invoke } from "@tauri-apps/api/core";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { platform } from "@platform";
 import { Check, ChevronRight, Loader2, RefreshCw, SearchCheck, Send, Trash2 } from "lucide-react";
 import { useProofHubStore, type RemoteItem } from "./useProofHubStore";
 import { linksTasks } from "../../db/proofhubSettings";
@@ -114,18 +113,18 @@ export function ProofHubView() {
     const opening = !debugLogOpen;
     setDebugLogOpen(opening);
     if (opening) {
-      setDebugLog(await invoke<string>("proofhub_read_debug_log"));
+      setDebugLog(await platform.proofhub!.readDebugLog());
     }
   };
 
   const handleCopyDebugLog = async () => {
-    await writeText(debugLog);
+    await platform.copyText(debugLog);
     setDebugCopied(true);
     setTimeout(() => setDebugCopied(false), 1500);
   };
 
   const handleClearDebugLog = async () => {
-    await invoke("proofhub_clear_debug_log");
+    await platform.proofhub!.clearDebugLog();
     setDebugLog("");
   };
 

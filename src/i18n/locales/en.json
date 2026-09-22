@@ -168,7 +168,9 @@
     "groupAppearance": "Appearance",
     "groupSystem": "System",
     "groupIntegrations": "Integrations",
-    "groupData": "Data and backup"
+    "groupData": "Data and backup",
+    "dataDescriptionWeb": "Chronos stores everything in this browser, on this device. Nothing is sent to the server. Clearing this site's data erases it, so export a backup regularly.",
+    "webUpdatesNote": "The web version updates itself when the server is updated. Reload the page to get the latest version."
   },
   "common": {
     "cancel": "Cancel",
@@ -264,5 +266,11 @@
   },
   "confirm": {
     "ok": "OK"
+  },
+  "startup": {
+    "otherTabTitle": "Chronos is already open in another tab",
+    "otherTabBody": "Your data can only be used by one tab at a time. Close the other tab and reload this one.",
+    "unsupportedTitle": "This browser can't run Chronos",
+    "unsupportedBody": "Chronos needs a recent browser and a secure (HTTPS) connection to store your data locally. Private windows may also block it."
   }
 }

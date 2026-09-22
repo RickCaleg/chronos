@@ -1,0 +1,22 @@
+# Chronos web. Settings come from `.env` (copy .env.example). See docs/WEB.md.
+#   Prebuilt image:   docker compose pull && docker compose up -d
+#   Build from repo:  docker compose up -d --build
+services:
+  chronos:
+    image: ghcr.io/rickcaleg/chronos-web:${CHRONOS_VERSION:-latest}
+    build: .
+    restart: unless-stopped
+    environment:
+      CHRONOS_ADDRESS: ${CHRONOS_ADDRESS:-:80}
+    ports:
+      - "${CHRONOS_HTTP_PORT:-80}:80"
+      - "${CHRONOS_HTTPS_PORT:-443}:443"
+      - "${CHRONOS_HTTPS_PORT:-443}:443/udp"
+    volumes:
+      # TLS certificates and keys; keeping them avoids re-issuing on every restart.
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

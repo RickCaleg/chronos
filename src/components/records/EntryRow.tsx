@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, Copy, Trash2 } from "lucide-react";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { platform } from "@platform";
 import { confirm } from "../ui/ConfirmDialog";
 import type { TimeEntry } from "../../types";
 import { useProjectsStore } from "../../store/useProjectsStore";
@@ -42,7 +42,7 @@ export function EntryRow({ entry }: { entry: TimeEntry }) {
 
   async function handleCopy() {
     const text = entry.taskNumber ? `${entry.taskNumber} - ${entry.description}` : entry.description;
-    await writeText(text);
+    await platform.copyText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }

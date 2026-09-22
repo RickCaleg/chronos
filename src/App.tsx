@@ -1,6 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { platform } from "@platform";
 import { TopNav, type View } from "./components/TopNav";
 import { CommandPalette } from "./components/CommandPalette";
 import { ConfirmDialog } from "./components/ui/ConfirmDialog";
@@ -66,12 +65,14 @@ function App() {
   }, []);
 
   useEffect(() => {
-    invoke("register_global_shortcut", { accelerator: useAppSettingsStore.getState().globalShortcut }).catch(() => {
+    const shortcut = platform.globalShortcut;
+    if (!shortcut) return;
+    shortcut.register(useAppSettingsStore.getState().globalShortcut).catch(() => {
       // Some other app may already own this combo, or the platform refused
       // it — not fatal, the in-app shortcuts and tray menu still work.
     });
 
-    const unlistenPromise = listen("toggle-timer-shortcut", () => {
+    return shortcut.onTriggered(() => {
       const { runningEntry, start, stop } = useEntriesStore.getState();
       if (runningEntry) {
         stop();
@@ -79,9 +80,6 @@ function App() {
         start({ description: "", taskNumber: null, projectId: null, startTime: nowIso() });
       }
     });
-    return () => {
-      unlistenPromise.then((unlisten) => unlisten());
-    };
   }, []);
 
   useEffect(() => {

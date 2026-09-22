@@ -29,6 +29,7 @@ A manual time tracker for people who just want to press play, work, and press st
 - **Native by platform** — native title bar on Windows, native GTK decorations on Linux desktop environments, no title bar at all under a standalone window manager (Hyprland, sway, i3, ...).
 - **Your data stays yours** — a local SQLite database, no telemetry, no account. The only two deliberate network exceptions are the self-updater below and the optional ProofHub integration, both off unless you turn them on.
 - **Self-updating** — checks GitHub Releases for a newer version on launch, plus a manual "Check for updates" button in Settings. Updates are cryptographically signed and verified before installing.
+- **Web version too** — the same app runs in a browser, with all data kept locally in that browser, self-hostable with one `docker compose up -d`. See [`docs/WEB.md`](docs/WEB.md).
 - **Optional ProofHub integration** — install a signed companion plugin from Settings to push logged hours into [ProofHub](https://www.proofhub.com) projects and timesheets, with optional task-level linking. Nothing related to it — no code, no credentials, no network calls — touches your machine until you click Install. See [`docs/proofhub-integration.md`](docs/proofhub-integration.md) for the full design.
 
 ## Tech stack
@@ -51,6 +52,7 @@ A manual time tracker for people who just want to press play, work, and press st
   curl -fsSL https://raw.githubusercontent.com/RickCaleg/chronos/master/packaging/appimage/install.sh | bash
   ```
   Review the script before piping it to a shell, as always — or clone the repo and run `packaging/appimage/install.sh` directly. Pass a version to install something other than the latest (`install.sh 0.5.0`); safe to re-run to reinstall/update.
+- **Web (self-hosted, Docker)**: see [`docs/WEB.md`](docs/WEB.md). Runs in any recent browser. Your data stays in that browser, the server never sees it.
 - **Other Linux (.deb/.rpm) / Windows**: grab an installer from the [latest release](https://github.com/RickCaleg/chronos/releases/latest) (`.deb`, `.rpm`, or `.msi`/`.exe`).
 
 ## Getting started

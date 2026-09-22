@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, ChevronRight, Copy } from "lucide-react";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { platform } from "@platform";
 import type { TimeEntry } from "../../types";
 import { useProjectsStore } from "../../store/useProjectsStore";
 import { EntryRow } from "./EntryRow";
@@ -31,7 +31,7 @@ export function GroupedEntryRow({ entries }: { entries: TimeEntry[] }) {
 
   async function handleCopy() {
     const text = first.taskNumber ? `${first.taskNumber} - ${first.description}` : first.description;
-    await writeText(text);
+    await platform.copyText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }

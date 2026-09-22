@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { invoke } from "@tauri-apps/api/core";
+import { platform } from "@platform";
 import * as proofhubDb from "../../db/proofhubSettings";
 import type { ProofHubProjectMap, ProofHubProjectMapping } from "../../db/proofhubSettings";
 import type { RemoteEntryState } from "./plan";
@@ -13,11 +13,6 @@ export interface RemoteItem {
 export interface RemoteTask {
   id: string;
   listId: string;
-}
-
-interface PluginStatus {
-  installed: boolean;
-  version: string | null;
 }
 
 interface ProofHubState {
@@ -88,9 +83,14 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
   remoteEntries: {},
 
   load: async () => {
+    const backend = platform.proofhub;
+    if (!backend) {
+      set({ loaded: true, installed: false });
+      return;
+    }
     const [status, subdomain, projectMap, groupPushesByDay] = await Promise.all([
-      invoke<PluginStatus>("proofhub_plugin_status"),
-      invoke<string | null>("proofhub_connection_status"),
+      backend.pluginStatus(),
+      backend.connectionStatus(),
       proofhubDb.getProjectMap(),
       proofhubDb.getGroupPushesByDay(),
     ]);
@@ -107,7 +107,7 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
   install: async () => {
     set({ busy: true, error: null });
     try {
-      await invoke("proofhub_plugin_install");
+      await platform.proofhub!.install();
       await get().load();
     } catch (err) {
       set({ error: String(err) });
@@ -120,7 +120,7 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
   uninstall: async () => {
     set({ busy: true, error: null });
     try {
-      await invoke("proofhub_plugin_uninstall");
+      await platform.proofhub!.uninstall();
       set({ remoteProjects: null, timesheetsByProject: {}, tasksByTicket: {}, remoteEntries: {} });
       await get().load();
     } finally {
@@ -133,8 +133,8 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
     try {
       // Verify the given credentials before saving them, so a typo'd key
       // never gets silently persisted as if it were a working connection.
-      await invoke("proofhub_test_connection", { subdomain, apiKey });
-      await invoke("proofhub_save_credentials", { subdomain, apiKey });
+      await platform.proofhub!.testConnection(subdomain, apiKey);
+      await platform.proofhub!.saveCredentials(subdomain, apiKey);
       await get().load();
     } catch (err) {
       set({ error: String(err) });
@@ -145,7 +145,7 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
   },
 
   disconnect: async () => {
-    await invoke("proofhub_clear_credentials");
+    await platform.proofhub!.clearCredentials();
     set({ remoteProjects: null, timesheetsByProject: {}, tasksByTicket: {}, remoteEntries: {} });
     await get().load();
   },
@@ -165,7 +165,7 @@ export const useProofHubStore = create<ProofHubState>((set, get) => ({
     set({ groupPushesByDay: value });
   },
 
-  call: (action, payload = {}) => invoke("proofhub_plugin_call", { action, payload }),
+  call: (action, payload = {}) => platform.proofhub!.call(action, payload),
 
   loadRemoteProjects: async (force = false) => {
     const cached = get().remoteProjects;
