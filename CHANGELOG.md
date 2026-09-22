@@ -4,6 +4,8 @@ All notable changes to Chronos are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.6.1] - 2026-09-22
 ### Added
 - The note of the entry being timed can be written while the timer runs, from the timer bar — until now a note could only be added after stopping, from the entry's row. Ctrl+Enter saves it without stopping the timer, and it travels with the entry when the timer stops.
 
