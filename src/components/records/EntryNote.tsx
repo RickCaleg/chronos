@@ -20,7 +20,16 @@ function sharedNote(entries: TimeEntry[]): { note: string | null; mixed: boolean
 }
 
 /** The row's toggle for its note editor; accent-coloured when there's a note. */
-export function NoteButton({ entries, onClick }: { entries: TimeEntry[]; onClick: () => void }) {
+export function NoteButton({
+  entries,
+  onClick,
+  alwaysVisible = false,
+}: {
+  entries: TimeEntry[];
+  onClick: () => void;
+  /** For use outside a list row, where there's no row hover to reveal it. */
+  alwaysVisible?: boolean;
+}) {
   const { t } = useTranslation();
   const hasNote = entries.some((e) => e.note?.trim());
   const label = hasNote ? t("records.editNote") : t("records.addNote");
@@ -31,7 +40,7 @@ export function NoteButton({ entries, onClick }: { entries: TimeEntry[]; onClick
       aria-label={label}
       title={label}
       // With a note it's state worth seeing; without one, just an action.
-      className={cn(rowIconButton, hasNote ? "text-[var(--color-accent)]" : revealOnRowHover)}
+      className={cn(rowIconButton, hasNote ? "text-[var(--color-accent)]" : !alwaysVisible && revealOnRowHover)}
     >
       <NotebookPen size={14} />
     </button>

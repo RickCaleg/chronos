@@ -39,6 +39,14 @@ try {
   await page.getByRole("button", { name: "Stop", exact: true }).waitFor();
   await input.click();
   await input.pressSequentially(typed, { delay: 30 });
+
+  // The running entry's note, edited in the timer bar (it has no row yet).
+  await page.getByRole("button", { name: "Add a note" }).first().click();
+  await page.getByRole("textbox", { name: "Note" }).pressSequentially("note while running", { delay: 20 });
+  await page.keyboard.press("Control+Enter");
+  await page.getByRole("button", { name: "Stop", exact: true }).waitFor({ timeout: 5000 });
+  step("note written while the timer runs, without stopping it");
+
   await page.getByRole("button", { name: "Stop", exact: true }).click();
   await page.waitForTimeout(500);
   await page.reload();
@@ -60,8 +68,8 @@ try {
   const backup = JSON.parse(readFileSync(backupPath, "utf8"));
   const entry = backup.timeEntries?.find((e) => e.taskNumber === "#1234");
   const running = backup.timeEntries?.find((e) => e.taskNumber === "#99");
-  if (running?.description !== "typed while running") {
-    throw new Error(`description typed while running was mangled: ${JSON.stringify(running)}`);
+  if (running?.description !== "typed while running" || running?.note !== "note while running") {
+    throw new Error(`what was typed while running was mangled: ${JSON.stringify(running)}`);
   }
   if (backup.timeEntries?.length !== 2 || entry.taskNumber !== "#1234" || entry.description !== "web smoke test") {
     throw new Error(`unexpected backup content: ${JSON.stringify(backup.timeEntries)}`);

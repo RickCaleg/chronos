@@ -7,6 +7,7 @@ import { ProjectPicker } from "./ProjectPicker";
 import { TimeAdjustPopover } from "./TimeAdjustPopover";
 import { discardRunningTimer } from "./discardTimer";
 import { AutocompleteInput } from "../ui/AutocompleteInput";
+import { EntryNote, NoteButton } from "../records/EntryNote";
 import { durationBetween, formatClock, nowIso } from "../../lib/time";
 import { cn } from "../../lib/cn";
 import { useSuggestions } from "../../hooks/useSuggestions";
@@ -19,6 +20,7 @@ export function TimerBar() {
   const { projects } = useProjectsStore();
   const [draft, setDraft] = useState("");
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [editingNote, setEditingNote] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const barRef = useRef<HTMLDivElement>(null);
   const suggestions = useSuggestions();
@@ -32,6 +34,7 @@ export function TimerBar() {
   // task number. It resyncs whenever another timer becomes the running one.
   useEffect(() => {
     setDraft(runningEntry ? combineTaskDescription(runningEntry.taskNumber, runningEntry.description) : "");
+    setEditingNote(false);
   }, [runningEntry?.id]);
 
   useEffect(() => {
@@ -112,56 +115,71 @@ export function TimerBar() {
   return (
     <div
       ref={barRef}
-      className="flex flex-wrap items-center gap-2 rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-3"
+      className="rounded-[2px] border border-[var(--color-border)] bg-[var(--color-surface)] p-3"
     >
-      <AutocompleteInput
-        value={draft}
-        onChange={handleCombinedChange}
-        onSelect={handleSelectSuggestion}
-        onKeyDown={handleStartKeyDown}
-        onPaste={handleEntryPaste}
-        placeholder={t("timer.combinedPlaceholder")}
-        suggestions={suggestions.map((s) => s.display)}
-        className="min-w-[160px] flex-1"
-      />
-      <ProjectPicker
-        value={isRunning ? runningEntry.projectId : projectId}
-        onChange={(id) => (isRunning ? update(runningEntry.id, { projectId: id }) : setProjectId(id))}
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <AutocompleteInput
+          value={draft}
+          onChange={handleCombinedChange}
+          onSelect={handleSelectSuggestion}
+          onKeyDown={handleStartKeyDown}
+          onPaste={handleEntryPaste}
+          placeholder={t("timer.combinedPlaceholder")}
+          suggestions={suggestions.map((s) => s.display)}
+          className="min-w-[160px] flex-1"
+        />
+        <ProjectPicker
+          value={isRunning ? runningEntry.projectId : projectId}
+          onChange={(id) => (isRunning ? update(runningEntry.id, { projectId: id }) : setProjectId(id))}
+        />
 
-      <div className="ml-auto flex items-center gap-3">
-        {isRunning && <TimeAdjustPopover startTime={runningEntry.startTime} onChange={setRunningStart} />}
-        <span
-          className={cn(
-            "w-20 text-right font-mono text-lg tabular-nums transition-colors",
-            !isRunning && "text-[var(--color-text-muted)] opacity-60",
+        <div className="ml-auto flex items-center gap-3">
+          {isRunning && (
+            <NoteButton entries={[runningEntry]} onClick={() => setEditingNote(true)} alwaysVisible />
           )}
-        >
-          {formatClock(elapsed)}
-        </span>
-        {isRunning && (
+          {isRunning && <TimeAdjustPopover startTime={runningEntry.startTime} onChange={setRunningStart} />}
+          <span
+            className={cn(
+              "w-20 text-right font-mono text-lg tabular-nums transition-colors",
+              !isRunning && "text-[var(--color-text-muted)] opacity-60",
+            )}
+          >
+            {formatClock(elapsed)}
+          </span>
+          {isRunning && (
+            <button
+              type="button"
+              onClick={() => discardRunningTimer(t)}
+              aria-label={t("timer.discard")}
+              title={t("timer.discard")}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[2px] text-[var(--color-text-muted)] outline-none transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-danger)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)]"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => discardRunningTimer(t)}
-            aria-label={t("timer.discard")}
-            title={t("timer.discard")}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[2px] text-[var(--color-text-muted)] outline-none transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-danger)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-[var(--color-accent)]"
+            onClick={isRunning ? stop : handleStart}
+            aria-label={isRunning ? t("timer.stop") : t("timer.start")}
+            className={cn(
+              "flex h-11 w-11 shrink-0 items-center justify-center rounded-[2px] text-white transition-colors cursor-pointer outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]",
+              isRunning ? "bg-[var(--color-danger)] hover:opacity-90" : "bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)]",
+            )}
           >
-            <Trash2 size={16} />
+            {isRunning ? <Square size={16} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
           </button>
-        )}
-        <button
-          type="button"
-          onClick={isRunning ? stop : handleStart}
-          aria-label={isRunning ? t("timer.stop") : t("timer.start")}
-          className={cn(
-            "flex h-11 w-11 shrink-0 items-center justify-center rounded-[2px] text-white transition-colors cursor-pointer outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]",
-            isRunning ? "bg-[var(--color-danger)] hover:opacity-90" : "bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)]",
-          )}
-        >
-          {isRunning ? <Square size={16} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
-        </button>
+        </div>
       </div>
+
+      {/* The running entry has no row in the list, so its note is edited here. */}
+      {isRunning && (
+        <EntryNote
+          entries={[runningEntry]}
+          editing={editingNote}
+          onEditingChange={setEditingNote}
+          indentClass="pl-0 pt-2"
+        />
+      )}
     </div>
   );
 }
