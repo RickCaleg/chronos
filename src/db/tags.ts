@@ -37,10 +37,13 @@ export async function deleteTag(id: string): Promise<void> {
 /** Replaces the full set of tags attached to an entry. */
 export async function setEntryTags(entryId: string, tagIds: string[]): Promise<void> {
   const db = await getDb();
-  await db.execute("DELETE FROM entry_tags WHERE entry_id = $1", [entryId]);
-  for (const tagId of tagIds) {
-    await db.execute("INSERT OR IGNORE INTO entry_tags (entry_id, tag_id) VALUES ($1, $2)", [entryId, tagId]);
-  }
+  await db.batch([
+    { sql: "DELETE FROM entry_tags WHERE entry_id = $1", params: [entryId] },
+    ...tagIds.map((tagId) => ({
+      sql: "INSERT OR IGNORE INTO entry_tags (entry_id, tag_id) VALUES ($1, $2)",
+      params: [entryId, tagId],
+    })),
+  ]);
 }
 
 /** All entry->tags associations in one query, for attaching to a freshly-loaded entry list. */
@@ -61,18 +64,24 @@ export async function listEntryTags(): Promise<Map<string, Tag[]>> {
 
 export async function replaceAllTags(tags: Tag[]): Promise<void> {
   const db = await getDb();
-  await db.execute("DELETE FROM tags");
-  for (const tag of tags) {
-    await db.execute("INSERT INTO tags (id, name, created_at) VALUES ($1, $2, $3)", [tag.id, tag.name, tag.createdAt]);
-  }
+  await db.batch([
+    { sql: "DELETE FROM tags" },
+    ...tags.map((tag) => ({
+      sql: "INSERT INTO tags (id, name, created_at) VALUES ($1, $2, $3)",
+      params: [tag.id, tag.name, tag.createdAt],
+    })),
+  ]);
 }
 
 export async function replaceAllEntryTags(entries: { id: string; tags: Tag[] }[]): Promise<void> {
   const db = await getDb();
-  await db.execute("DELETE FROM entry_tags");
-  for (const entry of entries) {
-    for (const tag of entry.tags) {
-      await db.execute("INSERT OR IGNORE INTO entry_tags (entry_id, tag_id) VALUES ($1, $2)", [entry.id, tag.id]);
-    }
-  }
+  await db.batch([
+    { sql: "DELETE FROM entry_tags" },
+    ...entries.flatMap((entry) =>
+      entry.tags.map((tag) => ({
+        sql: "INSERT OR IGNORE INTO entry_tags (entry_id, tag_id) VALUES ($1, $2)",
+        params: [entry.id, tag.id],
+      })),
+    ),
+  ]);
 }

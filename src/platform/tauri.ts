@@ -15,7 +15,18 @@ import type { Platform, ProofHubPluginStatus } from "./types";
 export const platform: Platform = {
   kind: "desktop",
   init: async () => ({ ok: true }),
-  openDatabase: () => SqlDatabase.load("sqlite:chronos.db"),
+  openDatabase: async () => {
+    const db = await SqlDatabase.load("sqlite:chronos.db");
+    return {
+      select: <T>(query: string, bindValues?: unknown[]) => db.select<T>(query, bindValues),
+      execute: (query, bindValues) => db.execute(query, bindValues),
+      // No transaction: the plugin's connection pool doesn't guarantee that
+      // BEGIN and the statements after it run on the same connection.
+      batch: async (statements) => {
+        for (const s of statements) await db.execute(s.sql, s.params);
+      },
+    };
+  },
   appVersion: getVersion,
   copyText: writeText,
   openUrl: (url) => openUrl(url),

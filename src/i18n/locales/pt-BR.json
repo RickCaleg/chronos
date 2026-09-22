@@ -60,7 +60,8 @@
     "groupTagsHint": "Tags que só alguns lançamentos têm não aparecem aqui e são mantidas. O que você adicionar ou remover vale para todos.",
     "deleteGroup": "Excluir os {{count}}",
     "deleteGroupConfirm": "Excluir os {{count}} lançamentos deste grupo?",
-    "thisWeek": "Semana"
+    "thisWeek": "Semana",
+    "showMore": "Mostrar mais {{count}} dias ({{total}} anteriores)"
   },
   "editor": {
     "taskDescription": "Task e descrição",

@@ -73,11 +73,11 @@ export async function deleteProject(id: string): Promise<void> {
 
 export async function replaceAllProjects(projects: Project[]): Promise<void> {
   const db = await getDb();
-  await db.execute("DELETE FROM projects");
-  for (const p of projects) {
-    await db.execute(
-      "INSERT INTO projects (id, name, color, alias, archived, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
-      [p.id, p.name, p.color, p.alias, p.archived ? 1 : 0, p.createdAt],
-    );
-  }
+  await db.batch([
+    { sql: "DELETE FROM projects" },
+    ...projects.map((p) => ({
+      sql: "INSERT INTO projects (id, name, color, alias, archived, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
+      params: [p.id, p.name, p.color, p.alias, p.archived ? 1 : 0, p.createdAt],
+    })),
+  ]);
 }

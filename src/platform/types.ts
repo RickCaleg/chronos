@@ -3,10 +3,17 @@ export interface QueryResult {
   lastInsertId?: number;
 }
 
+export interface Statement {
+  sql: string;
+  params?: unknown[];
+}
+
 /** The subset of `@tauri-apps/plugin-sql`'s Database the app uses; both builds implement it. */
 export interface Database {
   select<T>(query: string, bindValues?: unknown[]): Promise<T>;
   execute(query: string, bindValues?: unknown[]): Promise<QueryResult>;
+  /** Runs the statements in order: as one transaction on the web, one by one on desktop. */
+  batch(statements: Statement[]): Promise<void>;
 }
 
 export interface FileFilter {

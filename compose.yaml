@@ -6,6 +6,12 @@ services:
     image: ghcr.io/rickcaleg/chronos-web:${CHRONOS_VERSION:-latest}
     build: .
     restart: unless-stopped
+    # Caddy only needs to bind ports and write its two volumes.
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: [/tmp]
     environment:
       CHRONOS_ADDRESS: ${CHRONOS_ADDRESS:-:80}
     ports:
@@ -24,6 +30,9 @@ services:
     image: docker.io/cloudflare/cloudflared:latest
     profiles: ["tunnel"]
     command: tunnel --no-autoupdate run
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
     restart: unless-stopped

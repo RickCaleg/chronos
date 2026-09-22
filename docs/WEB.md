@@ -104,12 +104,18 @@ DNS must be managed by Cloudflare.
    and `chmod 600 .env`, since the token grants control of the tunnel.
 4. `docker compose up -d --build`, then `docker compose logs cloudflared`
    should show `Registered tunnel connection`.
-5. In the Cloudflare dashboard for the domain, turn off anything that injects
-   scripts into pages, which the Content-Security-Policy would block:
-   **Rocket Loader** (Speed → Optimization), **Email Address Obfuscation**
-   (Scrape Shield), and automatic Web Analytics injection. Optionally add a
-   **Cache Rule** caching everything under `/assets/*`, so the files are served
-   from Cloudflare's edge instead of your connection.
+5. In the Cloudflare dashboard for the domain:
+   - Turn off anything that injects scripts into pages, which the
+     Content-Security-Policy would block: **Rocket Loader** (Speed →
+     Optimization), **Email Address Obfuscation** (Scrape Shield), and
+     automatic Web Analytics injection.
+   - Turn on **Always Use HTTPS** (SSL/TLS → Edge Certificates). Caddy also
+     redirects plain-HTTP visitors, but Cloudflare does it without a round
+     trip to your server.
+   - Add a **Cache Rule**: hostname equals your Chronos hostname *and* URI
+     path starts with `/assets/` → Eligible for cache. Cloudflare doesn't
+     cache `.wasm` files by default, so without it the 420 KB SQLite module
+     comes from your connection on every first visit.
 6. Optional: **Zero Trust → Access → Applications** can put a login (e.g. an
    email code) in front of the hostname, so only you can open it.
 
@@ -199,9 +205,29 @@ docker run --rm --network host -v "$PWD/docker":/t:ro -w /tmp \
 | Tunnel: `Bad gateway` (502) | The public hostname's URL must be `http://chronos:80`, not `localhost`. |
 | ProofHub: "network error: Failed to fetch" | The subdomain doesn't exist (check the part before `.proofhub.com`), or something blocks `*.proofhub.com` (an ad blocker, or a CSP changed in `docker/Caddyfile`). |
 | Tunnel: console CSP errors, blank page | A Cloudflare feature injects scripts: turn off Rocket Loader, Email Obfuscation and Web Analytics injection. |
+| Caddy exits with `read-only file system` | The container runs read-only and needs its `/data` and `/config` volumes, as `compose.yaml` mounts them. When running it by hand with `--read-only`, add `-v chronos_data:/data -v chronos_config:/config`. |
 | `address already in use` on start | Another service uses port 80/443. Stop it, or use `CHRONOS_HTTP_PORT`/`CHRONOS_HTTPS_PORT` behind that service. |
 | Data disappeared | The browser's site data was cleared, or a different address/port/browser is in use (each is separate storage). Restore from a JSON backup. |
 | New version not showing | Reload the page. `index.html` is never cached, so a reload always gets what the server serves. |
+
+## Security checklist
+
+The server never holds anyone's data, but it serves the code that runs next
+to that data. Whoever can change what it serves can read every visitor's
+entries and ProofHub API key. So the things to protect are the ones that
+decide what gets served:
+
+- **The server**: SSH with keys only (`PasswordAuthentication no` in
+  `/etc/ssh/sshd_config`), and automatic security updates
+  (`sudo apt install unattended-upgrades`). With Cloudflare Tunnel no port
+  needs to be open to the internet; the compose ports are bound to
+  `127.0.0.1`. (Docker bypasses `ufw` for published ports, which is why
+  binding to localhost matters.)
+- **The GitHub account** the server pulls and builds from: two-factor authentication.
+- **The Cloudflare account**: two-factor authentication. It can change
+  responses, and route the tunnel to other machines on your network.
+- Optional: **Cloudflare Access** (Zero Trust → Access → Applications) to
+  allow only your email, so the app isn't publicly reachable at all.
 
 ## Publishing the image
 
@@ -241,9 +267,16 @@ To test the production image locally: `docker compose up --build` with
   a TypeScript port of `proofhub-plugin/src/main.rs` plus encrypted credential
   storage. See [`proofhub-integration.md` §14](proofhub-integration.md#14-web-version).
 - `docker/Caddyfile` serves `dist-web/` with a strict Content-Security-Policy,
-  long caching for hashed assets, and no caching for `index.html`. Its
-  `default_sni` makes IP mode work: clients send no SNI to an IP, and inside
-  the container the local address isn't the host's IP.
+  HSTS, COOP/CORP, a year of caching for hashed assets, and no caching for
+  everything else. A missing `/assets/` file is a 404 (never `index.html`,
+  which would then be cached for a year under a script's URL). Visitors that
+  Cloudflare or another proxy marks as plain HTTP (`X-Forwarded-Proto: http`)
+  are redirected to HTTPS. Its `default_sni` makes IP mode work: clients send
+  no SNI to an IP, and inside the container the local address isn't the
+  host's IP.
+- `compose.yaml` runs both containers with a read-only filesystem, no Linux
+  capabilities (Caddy keeps only the one to bind ports 80/443) and
+  `no-new-privileges`. Caddy writes only to its two volumes.
 - `docker/smoke-test.mjs` is the end-to-end check described above.
 
 | File | Role |

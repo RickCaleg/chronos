@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, ChevronRight, Copy } from "lucide-react";
 import { platform } from "@platform";
@@ -15,9 +15,13 @@ import { cn } from "../../lib/cn";
 import { SyncBadge } from "../../integrations/proofhub/SyncBadge";
 
 
-export function GroupedEntryRow({ entries }: { entries: TimeEntry[] }) {
+/** Grouping rebuilds the arrays on every change, so compare the entries themselves. */
+const sameEntries = (a: { entries: TimeEntry[] }, b: { entries: TimeEntry[] }) =>
+  a.entries.length === b.entries.length && a.entries.every((e, i) => e === b.entries[i]);
+
+export const GroupedEntryRow = memo(function GroupedEntryRow({ entries }: { entries: TimeEntry[] }) {
   const { t } = useTranslation();
-  const { projects } = useProjectsStore();
+  const projects = useProjectsStore((s) => s.projects);
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [editingNote, setEditingNote] = useState(false);
@@ -148,4 +152,4 @@ export function GroupedEntryRow({ entries }: { entries: TimeEntry[] }) {
       )}
     </div>
   );
-}
+}, sameEntries);

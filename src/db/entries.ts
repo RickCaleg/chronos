@@ -204,13 +204,13 @@ export async function deleteEntry(id: string): Promise<void> {
 
 export async function replaceAllEntries(entries: TimeEntry[]): Promise<void> {
   const db = await getDb();
-  await db.execute("DELETE FROM time_entries");
-  for (const e of entries) {
-    await db.execute(
-      `INSERT INTO time_entries
+  await db.batch([
+    { sql: "DELETE FROM time_entries" },
+    ...entries.map((e) => ({
+      sql: `INSERT INTO time_entries
         (id, description, task_number, project_id, start_time, end_time, duration_seconds, is_running, created_at, updated_at, proofhub_time_entry_id, proofhub_synced_at, note)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-      [
+      params: [
         e.id,
         e.description,
         e.taskNumber,
@@ -225,6 +225,6 @@ export async function replaceAllEntries(entries: TimeEntry[]): Promise<void> {
         e.proofhubSyncedAt ?? null,
         e.note ?? null,
       ],
-    );
-  }
+    })),
+  ]);
 }

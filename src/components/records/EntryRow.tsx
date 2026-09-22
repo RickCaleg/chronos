@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, Copy, Trash2 } from "lucide-react";
 import { platform } from "@platform";
@@ -17,10 +17,16 @@ import { SyncBadge } from "../../integrations/proofhub/SyncBadge";
 import i18n from "../../i18n";
 
 
-export function EntryRow({ entry }: { entry: TimeEntry }) {
+/**
+ * Memoized, and subscribed to the stores by selector: a row re-renders only
+ * when its own entry (or the project list) changes, not on every change to
+ * any entry, such as starting the timer.
+ */
+export const EntryRow = memo(function EntryRow({ entry }: { entry: TimeEntry }) {
   const { t } = useTranslation();
-  const { projects } = useProjectsStore();
-  const { update, remove } = useEntriesStore();
+  const projects = useProjectsStore((s) => s.projects);
+  const update = useEntriesStore((s) => s.update);
+  const remove = useEntriesStore((s) => s.remove);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [editingNote, setEditingNote] = useState(false);
@@ -132,13 +138,17 @@ export function EntryRow({ entry }: { entry: TimeEntry }) {
 
       <EntryNote entries={[entry]} editing={editingNote} onEditingChange={setEditingNote} />
 
-      <EntryEditPopover
-        open={open}
-        onClose={close}
-        entry={entry}
-        onSave={(patch) => update(entry.id, patch)}
-        onDelete={handleDelete}
-      />
+      {/* Mounted only while open: every row keeping one mounted rebuilt the
+          whole autocomplete list per row on each change to the entries. */}
+      {open && (
+        <EntryEditPopover
+          open
+          onClose={close}
+          entry={entry}
+          onSave={(patch) => update(entry.id, patch)}
+          onDelete={handleDelete}
+        />
+      )}
     </div>
   );
-}
+});

@@ -51,6 +51,9 @@ function normalizeItem(item: Json) {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Encodes one path/query value, so an id can never change the request's path or query. */
+const seg = (value: unknown) => encodeURIComponent(String(value));
+
 async function send(client: Client, method: string, path: string, body?: Json): Promise<Json> {
   const url = `https://${client.subdomain}.proofhub.com/api/v3${path}`;
   for (let attempt = 0; ; attempt++) {
@@ -98,7 +101,7 @@ const get = (client: Client, path: string) => send(client, "GET", path);
 
 /** `GET .../time/{id}` for a missing id returns the whole listing, not a 404. */
 async function timeEntryExists(client: Client, collection: string, timeId: string): Promise<boolean> {
-  const body = await get(client, `${collection}/${timeId}`);
+  const body = await get(client, `${collection}/${seg(timeId)}`);
   return stringifyId(body?.id) === timeId;
 }
 
@@ -129,14 +132,14 @@ export async function dispatch(action: string, p: Json, client: Client): Promise
       return extractList(await get(client, "/projects"), ["projects"]).map(normalizeItem);
 
     case "list-timesheets":
-      return extractList(await get(client, `/projects/${p.projectId}/timesheets`), ["timesheets"]).map(normalizeItem);
+      return extractList(await get(client, `/projects/${seg(p.projectId)}/timesheets`), ["timesheets"]).map(normalizeItem);
 
     case "find-task": {
       for (const completed of ["false", "true"]) {
         for (let start = 0; ; start += TASK_PAGE_SIZE) {
           const body = await get(
             client,
-            `/alltodo?projects=${p.projectId}&completed=${completed}&start=${start}&limit=${TASK_PAGE_SIZE}`,
+            `/alltodo?projects=${seg(p.projectId)}&completed=${completed}&start=${start}&limit=${TASK_PAGE_SIZE}`,
           );
           const page = extractList(body, ["tasks"]);
           const task = page.find((t) => stringifyId(t?.ticket) === p.ticket);
@@ -148,13 +151,13 @@ export async function dispatch(action: string, p: Json, client: Client): Promise
     }
 
     case "upsert-entry": {
-      const collection = `/projects/${p.projectId}/timesheets/${p.timesheetId}/time`;
+      const collection = `/projects/${seg(p.projectId)}/timesheets/${seg(p.timesheetId)}/time`;
       const body = timeEntryBody(p);
       const existing = p.timeId && (await timeEntryExists(client, collection, p.timeId)) ? (p.timeId as string) : null;
       let id: string;
       let raw: Json;
       if (existing) {
-        raw = await send(client, "PUT", `${collection}/${existing}`, body);
+        raw = await send(client, "PUT", `${collection}/${seg(existing)}`, body);
         id = existing;
       } else {
         raw = await send(client, "POST", collection, body);
@@ -168,14 +171,14 @@ export async function dispatch(action: string, p: Json, client: Client): Promise
       const listings = new Map<string, Map<string, Json>>();
       const results = [];
       for (const entry of p.entries as { projectId: string; timesheetId: string; timeId: string }[]) {
-        const collection = `/projects/${entry.projectId}/timesheets/${entry.timesheetId}/time`;
+        const collection = `/projects/${seg(entry.projectId)}/timesheets/${seg(entry.timesheetId)}/time`;
         if (!listings.has(collection)) {
           const items = extractList(await get(client, collection), ["time_entries"]);
           listings.set(collection, new Map(items.map((item) => [stringifyId(item?.id), item])));
         }
         let found = listings.get(collection)!.get(entry.timeId) ?? null;
         if (!found) {
-          const body = await get(client, `${collection}/${entry.timeId}`);
+          const body = await get(client, `${collection}/${seg(entry.timeId)}`);
           found = stringifyId(body?.id) === entry.timeId ? body : null;
         }
         results.push({
@@ -192,7 +195,7 @@ export async function dispatch(action: string, p: Json, client: Client): Promise
     }
 
     case "list-entries": {
-      const body = await get(client, `/projects/${p.projectId}/timesheets/${p.timesheetId}/time`);
+      const body = await get(client, `/projects/${seg(p.projectId)}/timesheets/${seg(p.timesheetId)}/time`);
       return extractList(body, ["time_entries"])
         .filter((item) => item?.by_me !== false)
         .filter((item) => typeof item?.date === "string" && item.date.slice(0, 10) >= p.since)
@@ -209,9 +212,9 @@ export async function dispatch(action: string, p: Json, client: Client): Promise
     }
 
     case "delete-entry": {
-      const collection = `/projects/${p.projectId}/timesheets/${p.timesheetId}/time`;
+      const collection = `/projects/${seg(p.projectId)}/timesheets/${seg(p.timesheetId)}/time`;
       if (await timeEntryExists(client, collection, p.timeId)) {
-        await send(client, "DELETE", `${collection}/${p.timeId}`);
+        await send(client, "DELETE", `${collection}/${seg(p.timeId)}`);
       }
       return null;
     }

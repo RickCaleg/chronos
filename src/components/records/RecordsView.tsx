@@ -1,20 +1,30 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useEntriesStore } from "../../store/useEntriesStore";
 import { useAppSettingsStore } from "../../store/useAppSettingsStore";
 import { DayGroup } from "./DayGroup";
 import { dayKey } from "../../lib/time";
 import { groupSimilarEntries } from "../../lib/grouping";
+import { Button } from "../ui/Button";
+
+/**
+ * Days rendered at first, and added per "show more". Rendering every day ever
+ * logged made the app take seconds to open, and to start or stop the timer,
+ * once the history reached a few thousand entries.
+ */
+const DAYS_PER_PAGE = 30;
 
 export function RecordsView() {
   const { t } = useTranslation();
-  const { entries, runningEntry } = useEntriesStore();
+  const entries = useEntriesStore((s) => s.entries);
+  const runningEntry = useEntriesStore((s) => s.runningEntry);
   const groupSimilar = useAppSettingsStore((s) => s.groupSimilarEntries);
+  const [visibleDays, setVisibleDays] = useState(DAYS_PER_PAGE);
 
-  const finished = entries.filter((e) => !e.isRunning);
   const runningDayKey = runningEntry ? dayKey(runningEntry.startTime) : null;
 
-  const groups = useMemo(() => {
+  const days = useMemo(() => {
+    const finished = entries.filter((e) => !e.isRunning);
     const today = dayKey(new Date().toISOString());
     const yesterday = dayKey(new Date(Date.now() - 86400000).toISOString());
 
@@ -33,9 +43,19 @@ export function RecordsView() {
       .map(([key, dayEntries]) => ({
         key,
         label: key === today ? ("today" as const) : key === yesterday ? ("yesterday" as const) : null,
-        items: groupSimilar ? groupSimilarEntries(dayEntries) : dayEntries,
+        dayEntries,
       }));
-  }, [finished, groupSimilar, runningDayKey]);
+  }, [entries, runningDayKey]);
+
+  const groups = useMemo(
+    () =>
+      days.slice(0, visibleDays).map((day) => ({
+        ...day,
+        items: groupSimilar ? groupSimilarEntries(day.dayEntries) : day.dayEntries,
+      })),
+    [days, visibleDays, groupSimilar],
+  );
+  const hiddenDays = days.length - groups.length;
 
   if (groups.length === 0) {
     return (
@@ -56,6 +76,13 @@ export function RecordsView() {
           runningEntry={group.key === runningDayKey ? runningEntry : null}
         />
       ))}
+      {hiddenDays > 0 && (
+        <div className="flex justify-center py-3">
+          <Button variant="secondary" size="sm" onClick={() => setVisibleDays((n) => n + DAYS_PER_PAGE)}>
+            {t("records.showMore", { count: Math.min(DAYS_PER_PAGE, hiddenDays), total: hiddenDays })}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

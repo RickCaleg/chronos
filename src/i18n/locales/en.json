@@ -60,7 +60,8 @@
     "groupTagsHint": "Tags only some entries have aren't shown; they're kept. What you add or remove here applies to all.",
     "deleteGroup": "Delete all {{count}}",
     "deleteGroupConfirm": "Delete all {{count}} entries in this group?",
-    "thisWeek": "This week"
+    "thisWeek": "This week",
+    "showMore": "Show {{count}} more days ({{total}} older)"
   },
   "editor": {
     "taskDescription": "Task & description",

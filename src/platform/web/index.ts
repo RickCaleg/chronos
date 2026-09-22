@@ -2,6 +2,8 @@ import type { Database, FileFilter, Platform, StartupResult } from "../types";
 import type { WorkerRequest, WorkerResponse } from "./db.worker";
 import { webProofHub } from "./proofhub";
 
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
 let database: Database | null = null;
 
 /**
@@ -25,16 +27,19 @@ function startDatabase(): Promise<Database> {
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
   let nextId = 1;
 
-  const request = (op: WorkerRequest["op"], sql: string, params?: unknown[]) =>
+  const request = (message: DistributiveOmit<WorkerRequest, "id">) =>
     new Promise<unknown>((resolve, reject) => {
       const id = nextId++;
       pending.set(id, { resolve, reject });
-      worker.postMessage({ id, op, sql, params } satisfies WorkerRequest);
+      worker.postMessage({ ...message, id } as WorkerRequest);
     });
 
   const db: Database = {
-    select: (sql, params) => request("select", sql, params) as Promise<never>,
-    execute: (sql, params) => request("execute", sql, params) as Promise<never>,
+    select: (sql, params) => request({ op: "select", sql, params }) as Promise<never>,
+    execute: (sql, params) => request({ op: "execute", sql, params }) as Promise<never>,
+    batch: async (statements) => {
+      await request({ op: "batch", statements });
+    },
   };
 
   return new Promise((resolve, reject) => {

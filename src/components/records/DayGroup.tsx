@@ -97,7 +97,7 @@ function DaySyncPill({
 
 export function DayGroup({ dayKey, label, items, runningEntry }: DayGroupProps) {
   const { t } = useTranslation();
-  const { projects } = useProjectsStore();
+  const projects = useProjectsStore((s) => s.projects);
   const [copied, setCopied] = useState(false);
   const [sendingDay, setSendingDay] = useState(false);
   const [checkingDay, setCheckingDay] = useState(false);

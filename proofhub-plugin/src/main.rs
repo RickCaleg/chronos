@@ -223,7 +223,7 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
                 client,
                 &subdomain,
                 &api_key,
-                &format!("/projects/{project_id}/timesheets"),
+                &format!("/projects/{}/timesheets", seg(&project_id)),
             )?;
             Ok(Value::Array(
                 extract_list(&body, &["timesheets"]).into_iter().map(normalize_item).collect(),
@@ -244,7 +244,7 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
                         client,
                         &subdomain,
                         &api_key,
-                        &format!("/alltodo?projects={project_id}&completed={completed}&start={start}&limit={TASK_PAGE_SIZE}"),
+                        &format!("/alltodo?projects={}&completed={completed}&start={start}&limit={TASK_PAGE_SIZE}", seg(&project_id)),
                     )?;
                     let page = extract_list(&body, &["tasks"]);
                     if let Some(task) = page.iter().find(|t| stringify_id(t.get("ticket")) == ticket) {
@@ -275,7 +275,7 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
             list_id,
             task_id,
         } => {
-            let collection = format!("/projects/{project_id}/timesheets/{timesheet_id}/time");
+            let collection = format!("/projects/{}/timesheets/{}/time", seg(&project_id), seg(&timesheet_id));
             let body = time_entry_body(
                 &project_id,
                 &timesheet_id,
@@ -293,7 +293,7 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
             };
             let (id, raw) = match existing {
                 Some(id) => {
-                    let raw = send(client, Method::PUT, &subdomain, &api_key, &format!("{collection}/{id}"), Some(&body))?;
+                    let raw = send(client, Method::PUT, &subdomain, &api_key, &format!("{collection}/{}", seg(&id)), Some(&body))?;
                     (id, raw)
                 }
                 None => {
@@ -322,7 +322,7 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
             let mut listings: HashMap<String, HashMap<String, Value>> = HashMap::new();
             let mut results = Vec::with_capacity(entries.len());
             for entry in entries {
-                let collection = format!("/projects/{}/timesheets/{}/time", entry.project_id, entry.timesheet_id);
+                let collection = format!("/projects/{}/timesheets/{}/time", seg(&entry.project_id), seg(&entry.timesheet_id));
                 if !listings.contains_key(&collection) {
                     let body = get(client, &subdomain, &api_key, &collection)?;
                     let by_id = extract_list(&body, &["time_entries"])
@@ -334,7 +334,7 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
                 let found = match listings[&collection].get(&entry.time_id) {
                     Some(item) => Some(item.clone()),
                     None => {
-                        let body = get(client, &subdomain, &api_key, &format!("{collection}/{}", entry.time_id))?;
+                        let body = get(client, &subdomain, &api_key, &format!("{collection}/{}", seg(&entry.time_id)))?;
                         (stringify_id(body.get("id")) == entry.time_id).then_some(body)
                     }
                 };
@@ -361,7 +361,7 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
             timesheet_id,
             since,
         } => {
-            let body = get(client, &subdomain, &api_key, &format!("/projects/{project_id}/timesheets/{timesheet_id}/time"))?;
+            let body = get(client, &subdomain, &api_key, &format!("/projects/{}/timesheets/{}/time", seg(&project_id), seg(&timesheet_id)))?;
             let entries = extract_list(&body, &["time_entries"])
                 .into_iter()
                 // Documented on every entry; treated as mine if ever absent.
@@ -391,9 +391,9 @@ fn dispatch(client: &Client, request: Request) -> Result<Value, PluginError> {
             timesheet_id,
             time_id,
         } => {
-            let collection = format!("/projects/{project_id}/timesheets/{timesheet_id}/time");
+            let collection = format!("/projects/{}/timesheets/{}/time", seg(&project_id), seg(&timesheet_id));
             if time_entry_exists(client, &subdomain, &api_key, &collection, &time_id)? {
-                send(client, Method::DELETE, &subdomain, &api_key, &format!("{collection}/{time_id}"), None)?;
+                send(client, Method::DELETE, &subdomain, &api_key, &format!("{collection}/{}", seg(&time_id)), None)?;
             }
             Ok(Value::Null)
         }
@@ -411,7 +411,7 @@ fn time_entry_exists(
     collection: &str,
     time_id: &str,
 ) -> Result<bool, PluginError> {
-    let body = send(client, Method::GET, subdomain, api_key, &format!("{collection}/{time_id}"), None)?;
+    let body = send(client, Method::GET, subdomain, api_key, &format!("{collection}/{}", seg(time_id)), None)?;
     Ok(stringify_id(body.get("id")) == time_id)
 }
 
@@ -447,6 +447,29 @@ fn base_url(subdomain: &str) -> String {
     format!("https://{subdomain}.proofhub.com/api/v3")
 }
 
+/// Only a bare label, so a typo'd or pasted value can't point the request
+/// (and the API key with it) at another host.
+fn valid_subdomain(subdomain: &str) -> bool {
+    !subdomain.is_empty()
+        && !subdomain.starts_with('-')
+        && !subdomain.ends_with('-')
+        && subdomain.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+}
+
+/// Percent-encodes one path/query value (everything but RFC 3986 unreserved
+/// characters), so an id can never change the request's path or query.
+fn seg(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
+            out.push(byte as char);
+        } else {
+            out.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    out
+}
+
 fn get(client: &Client, subdomain: &str, api_key: &str, path: &str) -> Result<Value, PluginError> {
     send(client, Method::GET, subdomain, api_key, path, None)
 }
@@ -465,6 +488,11 @@ fn send(
     path: &str,
     body: Option<&Value>,
 ) -> Result<Value, PluginError> {
+    if !valid_subdomain(subdomain) {
+        return Err(PluginError::internal(
+            "Invalid ProofHub subdomain: use just the part before .proofhub.com.".to_string(),
+        ));
+    }
     let url = format!("{}{}", base_url(subdomain), path);
     let mut attempt = 0;
     loop {

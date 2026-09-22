@@ -1,7 +1,9 @@
 import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
 import { MIGRATIONS } from "./migrations";
 
-export type WorkerRequest = { id: number; op: "select" | "execute"; sql: string; params?: unknown[] };
+export type WorkerRequest =
+  | { id: number; op: "select" | "execute"; sql: string; params?: unknown[] }
+  | { id: number; op: "batch"; statements: { sql: string; params?: unknown[] }[] };
 export type WorkerResponse =
   | { type: "ready" }
   | { type: "fatal"; error: string }
@@ -63,16 +65,26 @@ ready.then(
 );
 
 self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
-  const { id, op, sql, params } = event.data;
+  const request = event.data;
+  const { id } = request;
   try {
     const { sqlite3, db } = await ready;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const bind = toBind(sql, params) as any;
-    let value: unknown;
-    if (op === "select") {
-      value = db.selectObjects(sql, bind);
+    let value: unknown = null;
+    if (request.op === "batch") {
+      // One transaction: each statement committing on its own made importing
+      // a few thousand entries take minutes.
+      db.transaction(() => {
+        for (const s of request.statements) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          db.exec({ sql: s.sql, bind: toBind(s.sql, s.params) as any });
+        }
+      });
+    } else if (request.op === "select") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      value = db.selectObjects(request.sql, toBind(request.sql, request.params) as any);
     } else {
-      db.exec({ sql, bind });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      db.exec({ sql: request.sql, bind: toBind(request.sql, request.params) as any });
       value = {
         rowsAffected: db.changes(),
         lastInsertId: Number(sqlite3.capi.sqlite3_last_insert_rowid(db)),

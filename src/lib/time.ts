@@ -70,10 +70,23 @@ export function formatDurationHuman(totalSeconds: number): string {
   return `${h}h ${pad(m)}m`;
 }
 
+// Building an Intl.DateTimeFormat is far slower than using one, and these run for every visible row.
+const formatters = new Map<string, Intl.DateTimeFormat>();
+function formatter(locale: string, kind: "time" | "day"): Intl.DateTimeFormat {
+  const key = `${kind}|${locale}`;
+  let f = formatters.get(key);
+  if (!f) {
+    f = new Intl.DateTimeFormat(
+      locale,
+      kind === "time" ? { hour: "2-digit", minute: "2-digit" } : { weekday: "long", day: "2-digit", month: "long" },
+    );
+    formatters.set(key, f);
+  }
+  return f;
+}
+
 export function formatTimeShort(iso: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(
-    new Date(iso),
-  );
+  return formatter(locale, "time").format(new Date(iso));
 }
 
 /** Plain "dd/MM" date, locale-independent, for copy-to-clipboard text. */
@@ -83,9 +96,7 @@ export function formatDateShort(iso: string): string {
 }
 
 export function formatDayLabel(iso: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { weekday: "long", day: "2-digit", month: "long" }).format(
-    new Date(iso),
-  );
+  return formatter(locale, "day").format(new Date(iso));
 }
 
 export function dayKey(iso: string): string {

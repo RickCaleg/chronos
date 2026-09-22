@@ -13,10 +13,11 @@ import { nowIso } from "../../lib/time";
  */
 export function RestartButton({ entry }: { entry: TimeEntry }) {
   const { t } = useTranslation();
-  const { start, stop, runningEntry } = useEntriesStore();
+  const start = useEntriesStore((s) => s.start);
+  const stop = useEntriesStore((s) => s.stop);
 
   async function handleRestart() {
-    if (runningEntry) await stop();
+    if (useEntriesStore.getState().runningEntry) await stop();
     await start({
       description: entry.description,
       taskNumber: entry.taskNumber,

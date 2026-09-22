@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Command } from "lucide-react";
 import { useEntriesStore } from "../../store/useEntriesStore";
@@ -20,19 +21,25 @@ function weekStartKey(): string {
  */
 export function RecordsToolbar({ onOpenPalette }: { onOpenPalette: () => void }) {
   const { t } = useTranslation();
-  const { entries, runningEntry } = useEntriesStore();
+  const entries = useEntriesStore((s) => s.entries);
+  const runningEntry = useEntriesStore((s) => s.runningEntry);
   const running = useLiveElapsed(runningEntry?.startTime);
 
   const today = dayKey(new Date().toISOString());
   const weekStart = weekStartKey();
-  let todayTotal = 0;
-  let weekTotal = 0;
-  for (const e of entries) {
-    if (e.isRunning) continue;
-    const day = dayKey(e.startTime);
-    if (day === today) todayTotal += e.durationSeconds ?? 0;
-    if (day >= weekStart && day <= today) weekTotal += e.durationSeconds ?? 0;
-  }
+  // Only when entries or the day change, not on every tick of the running timer.
+  const finished = useMemo(() => {
+    let todayTotal = 0;
+    let weekTotal = 0;
+    for (const e of entries) {
+      if (e.isRunning) continue;
+      const day = dayKey(e.startTime);
+      if (day === today) todayTotal += e.durationSeconds ?? 0;
+      if (day >= weekStart && day <= today) weekTotal += e.durationSeconds ?? 0;
+    }
+    return { todayTotal, weekTotal };
+  }, [entries, today, weekStart]);
+  let { todayTotal, weekTotal } = finished;
   if (runningEntry) {
     const day = dayKey(runningEntry.startTime);
     if (day === today) todayTotal += running;
