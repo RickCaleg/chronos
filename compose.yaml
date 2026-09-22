@@ -17,6 +17,19 @@ services:
       - caddy_data:/data
       - caddy_config:/config
 
+  # Cloudflare Tunnel: publishes the site through Cloudflare with no open ports
+  # on the router. Enabled with COMPOSE_PROFILES=tunnel in .env; the tunnel's
+  # public hostname must point at http://chronos:80.
+  cloudflared:
+    image: docker.io/cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    restart: unless-stopped
+    depends_on:
+      - chronos
+
 volumes:
   caddy_data:
   caddy_config:

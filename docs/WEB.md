@@ -61,6 +61,8 @@ Edit `.env` and set `CHRONOS_ADDRESS`:
   export it with
   `docker compose cp chronos:/data/caddy/pki/authorities/local/root.crt .`
   and import `root.crt` on each device.
+- **Cloudflare Tunnel** (domain on Cloudflare, no open ports, works with a
+  dynamic IP): see [Cloudflare Tunnel](#cloudflare-tunnel) below.
 - **Behind an existing reverse proxy** (nginx, Traefik, another Caddy) that
   already does HTTPS: `CHRONOS_ADDRESS=:80` and `CHRONOS_HTTP_PORT=8080`, then
   proxy to `http://127.0.0.1:8080`.
@@ -74,6 +76,38 @@ docker compose up -d
 
 If the image isn't published (or the GHCR package is private), build it on the
 server instead: `docker compose up -d --build`.
+
+### Cloudflare Tunnel
+
+`cloudflared` opens an outbound connection to Cloudflare, which serves the site
+over HTTPS on your domain and forwards requests through it. Nothing on the
+router needs to change, and the server's IP can change freely. The domain's
+DNS must be managed by Cloudflare.
+
+1. In the Cloudflare dashboard: **Zero Trust → Networks → Tunnels → Create a
+   tunnel → Cloudflared**, give it a name, and copy the token (the long string
+   after `--token` in the install command shown; don't run that command).
+2. In the tunnel, add a **Public hostname**: subdomain `chronos`, your domain,
+   service type **HTTP**, URL **`chronos:80`** (the compose service name).
+3. In `.env`:
+   ```sh
+   CHRONOS_ADDRESS=:80
+   CHRONOS_HTTP_PORT=127.0.0.1:8080
+   CHRONOS_HTTPS_PORT=127.0.0.1:8443
+   COMPOSE_PROFILES=tunnel
+   CLOUDFLARE_TUNNEL_TOKEN=<token>
+   ```
+   and `chmod 600 .env`, since the token grants control of the tunnel.
+4. `docker compose up -d --build`, then `docker compose logs cloudflared`
+   should show `Registered tunnel connection`.
+5. In the Cloudflare dashboard for the domain, turn off anything that injects
+   scripts into pages, which the Content-Security-Policy would block:
+   **Rocket Loader** (Speed → Optimization), **Email Address Obfuscation**
+   (Scrape Shield), and automatic Web Analytics injection. Optionally add a
+   **Cache Rule** caching everything under `/assets/*`, so the files are served
+   from Cloudflare's edge instead of your connection.
+6. Optional: **Zero Trust → Access → Applications** can put a login (e.g. an
+   email code) in front of the hostname, so only you can open it.
 
 ### Updating
 
@@ -157,6 +191,9 @@ docker run --rm --network host -v "$PWD/docker":/t:ro -w /tmp \
 | "Chronos is already open in another tab" | Another tab (or window) of the same site holds the database. Close it and reload. |
 | Certificate warning in IP mode | Expected until each device trusts Caddy's `root.crt` (see step 3). |
 | Domain mode: no certificate | DNS must point at the server and ports 80 and 443 must be reachable from the internet. Check `docker compose logs chronos`. |
+| Tunnel: `Error 1033` / hostname doesn't load | `cloudflared` isn't connected: check `docker compose logs cloudflared` and the token in `.env`. |
+| Tunnel: `Bad gateway` (502) | The public hostname's URL must be `http://chronos:80`, not `localhost`. |
+| Tunnel: console CSP errors, blank page | A Cloudflare feature injects scripts: turn off Rocket Loader, Email Obfuscation and Web Analytics injection. |
 | `address already in use` on start | Another service uses port 80/443. Stop it, or use `CHRONOS_HTTP_PORT`/`CHRONOS_HTTPS_PORT` behind that service. |
 | Data disappeared | The browser's site data was cleared, or a different address/port/browser is in use (each is separate storage). Restore from a JSON backup. |
 | New version not showing | Reload the page. `index.html` is never cached, so a reload always gets what the server serves. |
